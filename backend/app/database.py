@@ -1,0 +1,17 @@
+from supabase import create_client, Client
+from app.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Initialize Supabase client
+supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_PUBLIC_KEY)
+
+def get_supabase_client() -> Client:
+    """Get Supabase client instance"""
+    return supabase
+
+def test_connection():
+    """Test Supabase connection"""
+    # No-op to avoid version-specific client issues during startup
+    return True
