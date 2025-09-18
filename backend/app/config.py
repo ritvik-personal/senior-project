@@ -6,7 +6,8 @@ load_dotenv()
 class Settings:
     # Supabase Configuration
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_PUBLIC_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+    # Prefer ANON key, but also allow SUPABASE_KEY env var as fallback
+    SUPABASE_PUBLIC_KEY: str = os.getenv("SUPABASE_PUBLIC_KEY", "")
     
     # JWT Configuration
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")

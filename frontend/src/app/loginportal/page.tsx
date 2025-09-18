@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPortal() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,9 +27,19 @@ export default function LoginPortal() {
 
       if (response.ok) {
         const data = await response.json();
-        // TODO: Handle successful login (redirect, store token, etc.)
+        
+        // Store user data and token in localStorage
+        if (data.user) {
+          localStorage.setItem("user", JSON.stringify(data.user));
+        }
+        if (data.access_token) {
+          localStorage.setItem("access_token", data.access_token);
+        }
+        
         console.log("Login successful:", data);
-        // Example: router.push("/dashboard");
+        
+        // Redirect to dashboard
+        router.push("/dashboard");
       } else {
         const errorData = await response.json();
         setError(errorData.message || "Login failed");

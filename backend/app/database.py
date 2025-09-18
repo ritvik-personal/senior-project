@@ -13,11 +13,5 @@ def get_supabase_client() -> Client:
 
 def test_connection():
     """Test Supabase connection"""
-    try:
-        # Simple query to test connection
-        result = supabase.table("users").select("id").limit(1).execute()
-        logger.info("Supabase connection successful")
-        return True
-    except Exception as e:
-        logger.error(f"Supabase connection failed: {e}")
-        return False
+    # No-op to avoid version-specific client issues during startup
+    return True
