@@ -1,9 +1,25 @@
+/**
+ * Sign Up Page Component
+ * 
+ * This component handles new user registration for the CampusFin platform.
+ * Features:
+ * - User registration with email, password, and name
+ * - Password confirmation validation
+ * - Integration with FastAPI backend registration endpoint
+ * - Token-based session management
+ * - Error handling and loading states
+ * - Automatic redirect to dashboard on successful registration
+ * 
+ * The component includes client-side validation for password matching
+ * and length requirements before making API calls.
+ */
+
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function SignUpPortal() {
+export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -132,7 +148,7 @@ export default function SignUpPortal() {
         <div className="mt-6 text-center">
           <p className="text-gray-600 dark:text-gray-300 mb-3">Already have an account?</p>
           <button 
-            onClick={() => router.push("/loginportal")}
+            onClick={() => router.push("/login")}
             className="w-full border-2 border-blue-600 text-blue-600 dark:text-blue-400 py-2.5 rounded-lg font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
           >
             Log In
