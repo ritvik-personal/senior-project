@@ -63,9 +63,15 @@ class AuthService:
 			return AuthResponse(success=False, message="Registration failed. Email may already be in use.")
 	
 	async def logout(self, access_token: str) -> AuthResponse:
-		"""Logout user from Supabase session."""
+		"""Logout user from Supabase session.
+		
+		Note: Supabase handles session management, so this primarily
+		serves as a placeholder for any cleanup logic needed.
+		The frontend should clear localStorage tokens regardless.
+		"""
 		try:
-			self.supabase.auth.sign_out()
+			# Supabase doesn't require explicit logout on server side
+			# Sessions are managed client-side and expire naturally
 			return AuthResponse(success=True, message="Logout successful")
 		except Exception as e:
 			logger.error(f"Logout error: {e}")

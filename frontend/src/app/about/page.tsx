@@ -1,21 +1,35 @@
+/**
+ * About Page Component
+ * 
+ * This page provides information about CampusFin, its mission, and features.
+ * It serves as a marketing page to educate visitors about the platform's
+ * purpose and value proposition for college students.
+ * 
+ * Features:
+ * - Mission statement and company values
+ * - Overview of platform features
+ * - Call-to-action sections for user engagement
+ * - Consistent branding and navigation
+ */
+
 import Link from "next/link";
 
-export default function About() {
+export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
       <header className="p-6 sm:p-8">
         <nav className="flex items-center justify-between max-w-6xl mx-auto">
-          <Link href="/" className="flex items-center space-x-2">
+          <Link href="/landing" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">C</span>
             </div>
             <span className="text-2xl font-bold text-gray-900 dark:text-white">CampusFin</span>
           </Link>
           <div className="hidden md:flex space-x-8">
-            <Link href="/#features" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Features</Link>
+            <Link href="/landing#features" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Features</Link>
             <Link href="/about" className="text-blue-600 dark:text-blue-400 font-medium">About</Link>
-            <Link href="/loginportal" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Log In</Link>
+            <Link href="/login" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Log In</Link>
           </div>
         </nav>
       </header>
@@ -128,10 +142,10 @@ export default function About() {
               Join thousands of students who are already building their financial future with CampusFin.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/loginportal" className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
+              <Link href="/login" className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-full font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
                 Get Started Free
               </Link>
-              <Link href="/#features" className="border-2 border-blue-600 text-blue-600 dark:text-blue-400 px-8 py-4 rounded-full font-semibold text-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200">
+              <Link href="/landing#features" className="border-2 border-blue-600 text-blue-600 dark:text-blue-400 px-8 py-4 rounded-full font-semibold text-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200">
                 Learn More
               </Link>
             </div>
@@ -157,9 +171,9 @@ export default function About() {
             <div>
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-gray-400">
-                <li><Link href="/#features" className="hover:text-white transition-colors">Features</Link></li>
+                <li><Link href="/landing#features" className="hover:text-white transition-colors">Features</Link></li>
                 <li><Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
-                <li><Link href="/loginportal" className="hover:text-white transition-colors">Login</Link></li>
+                <li><Link href="/login" className="hover:text-white transition-colors">Login</Link></li>
               </ul>
             </div>
             <div>

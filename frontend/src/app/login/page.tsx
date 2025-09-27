@@ -1,9 +1,24 @@
+/**
+ * Login Page Component
+ * 
+ * This component handles user authentication for the CampusFin platform.
+ * Features:
+ * - Email and password authentication
+ * - Integration with FastAPI backend
+ * - Token-based session management
+ * - Error handling and loading states
+ * - Automatic redirect to dashboard on successful login
+ * 
+ * The component uses localStorage to persist user data and access tokens
+ * for maintaining user sessions across browser refreshes.
+ */
+
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function LoginPortal() {
+export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -96,7 +111,7 @@ export default function LoginPortal() {
         <div className="mt-6 text-center">
           <p className="text-gray-600 dark:text-gray-300 mb-3">New User?</p>
           <button 
-            onClick={() => router.push("/signupportal")}
+            onClick={() => router.push("/login/signup")}
             className="w-full border-2 border-blue-600 text-blue-600 dark:text-blue-400 py-2.5 rounded-lg font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
           >
             Sign Up
