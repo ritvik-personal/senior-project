@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import health, users, auth
+from app.api import health, users, auth, expenses, groups, transactions, shared_wishlist
 from app.config import settings
 from app.database import test_connection
 import uvicorn
@@ -32,6 +32,10 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
+app.include_router(expenses.router, prefix="/api/expenses", tags=["expenses"])
+app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
+app.include_router(transactions.router, prefix="/api/transactions", tags=["transactions"])
+app.include_router(shared_wishlist.router, prefix="/api/shared-wishlist", tags=["shared-wishlist"])
 
 @app.on_event("startup")
 async def startup_event():
