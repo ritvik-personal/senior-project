@@ -1,21 +1,3 @@
-/**
- * Expense Tracking Page Component
- * 
- * This component handles expense tracking functionality including:
- * - Manual expense entry with categories and descriptions
- * - OCR receipt processing for automatic data extraction
- * - Personal and group expense tracking
- * - Roommate cost-sharing support
- * - Automatic categorization
- * 
- * Features:
- * - Add manual expenses with form validation
- * - Upload receipts for OCR processing
- * - View expense history and analytics
- * - Manage expense categories
- * - Split expenses with roommates/groups
- */
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -26,7 +8,7 @@ interface Expense {
   category: string;
   description: string;
   date: string;
-  type: 'personal' | 'group';
+  type: "personal" | "group";
   groupId?: string;
   participants?: string[];
 }
@@ -42,37 +24,58 @@ export default function ExpenseTrackingPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [expenseType, setExpenseType] = useState<'personal' | 'group'>('personal');
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [expenseType, setExpenseType] = useState<"personal" | "group">("personal");
+  const [expenseDate, setExpenseDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
 
   const categories: Category[] = [
-    { id: 'food', name: 'Food & Dining', icon: '🍽️', color: 'bg-orange-100 text-orange-800' },
-    { id: 'transport', name: 'Transportation', icon: '🚗', color: 'bg-blue-100 text-blue-800' },
-    { id: 'entertainment', name: 'Entertainment', icon: '🎬', color: 'bg-purple-100 text-purple-800' },
-    { id: 'supplies', name: 'School Supplies', icon: '📚', color: 'bg-green-100 text-green-800' },
-    { id: 'utilities', name: 'Utilities', icon: '⚡', color: 'bg-yellow-100 text-yellow-800' },
-    { id: 'other', name: 'Other', icon: '📦', color: 'bg-gray-100 text-gray-800' },
+    { id: "food", name: "Food & Dining", icon: "🍽️", color: "bg-orange-100 text-orange-800" },
+    { id: "transport", name: "Transportation", icon: "🚗", color: "bg-blue-100 text-blue-800" },
+    { id: "entertainment", name: "Entertainment", icon: "🎬", color: "bg-purple-100 text-purple-800" },
+    { id: "supplies", name: "School Supplies", icon: "📚", color: "bg-green-100 text-green-800" },
+    { id: "utilities", name: "Utilities", icon: "⚡", color: "bg-yellow-100 text-yellow-800" },
+    { id: "other", name: "Other", icon: "📦", color: "bg-gray-100 text-gray-800" },
   ];
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("expenses");
+    if (saved) {
+      try {
+        setExpenses(JSON.parse(saved));
+      } catch {
+        setExpenses([]);
+      }
+    }
+  }, []);
+
+  // Save to localStorage whenever expenses change
+  useEffect(() => {
+    localStorage.setItem("expenses", JSON.stringify(expenses));
+  }, [expenses]);
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || !selectedCategory || !description) return;
+    if (!amount || !selectedCategory || !description || !expenseDate) return;
 
     const newExpense: Expense = {
       id: Date.now().toString(),
       amount: parseFloat(amount),
       category: selectedCategory,
       description,
-      date: new Date().toISOString().split('T')[0],
+      date: expenseDate,
       type: expenseType,
     };
 
     setExpenses([newExpense, ...expenses]);
-    setAmount('');
-    setDescription('');
-    setSelectedCategory('');
+    setAmount("");
+    setDescription("");
+    setSelectedCategory("");
+    setExpenseDate(new Date().toISOString().split("T")[0]); // reset to today as a default value for a "new expense"
     setShowAddForm(false);
   };
 
@@ -85,10 +88,10 @@ export default function ExpenseTrackingPage() {
       const mockOCRResult: Expense = {
         id: Date.now().toString(),
         amount: 15.99,
-        category: 'food',
-        description: 'Coffee and pastry from campus cafe',
-        date: new Date().toISOString().split('T')[0],
-        type: 'personal',
+        category: "food",
+        description: "Coffee and pastry from campus cafe",
+        date: new Date().toISOString().split("T")[0],
+        type: "personal",
       };
       setExpenses([mockOCRResult, ...expenses]);
       setShowUploadForm(false);
@@ -97,7 +100,7 @@ export default function ExpenseTrackingPage() {
 
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   const monthlyExpenses = expenses
-    .filter(expense => {
+    .filter((expense) => {
       const expenseDate = new Date(expense.date);
       const currentMonth = new Date().getMonth();
       return expenseDate.getMonth() === currentMonth;
@@ -137,7 +140,9 @@ export default function ExpenseTrackingPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm text-gray-600 dark:text-gray-300">Total Expenses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalExpenses.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                ${totalExpenses.toFixed(2)}
+              </p>
             </div>
           </div>
         </div>
@@ -149,7 +154,9 @@ export default function ExpenseTrackingPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm text-gray-600 dark:text-gray-300">This Month</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">${monthlyExpenses.toFixed(2)}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                ${monthlyExpenses.toFixed(2)}
+              </p>
             </div>
           </div>
         </div>
@@ -197,7 +204,7 @@ export default function ExpenseTrackingPage() {
                   required
                 >
                   <option value="">Select category</option>
-                  {categories.map(category => (
+                  {categories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.icon} {category.name}
                     </option>
@@ -218,31 +225,45 @@ export default function ExpenseTrackingPage() {
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Expense Type
-              </label>
-              <div className="flex space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="personal"
-                    checked={expenseType === 'personal'}
-                    onChange={(e) => setExpenseType(e.target.value as 'personal' | 'group')}
-                    className="mr-2"
-                  />
-                  Personal
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Date
                 </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="group"
-                    checked={expenseType === 'group'}
-                    onChange={(e) => setExpenseType(e.target.value as 'personal' | 'group')}
-                    className="mr-2"
-                  />
-                  Group/Roommate
+                <input
+                  type="date"
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Expense Type
                 </label>
+                <div className="flex items-center h-full space-x-6">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="personal"
+                      checked={expenseType === "personal"}
+                      onChange={(e) => setExpenseType(e.target.value as "personal" | "group")}
+                      className="mr-2"
+                    />
+                    Personal
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      value="group"
+                      checked={expenseType === "group"}
+                      onChange={(e) => setExpenseType(e.target.value as "personal" | "group")}
+                      className="mr-2"
+                    />
+                    Group/Roommate
+                  </label>
+                </div>
               </div>
             </div>
             <div className="flex justify-end space-x-3">
@@ -304,16 +325,23 @@ export default function ExpenseTrackingPage() {
           <div className="text-center py-8">
             <span className="text-6xl mb-4 block">📱</span>
             <p className="text-gray-600 dark:text-gray-300">No expenses recorded yet</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Add your first expense to get started</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Add your first expense to get started
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {expenses.map(expense => {
-              const category = categories.find(cat => cat.id === expense.category);
+            {expenses.map((expense) => {
+              const category = categories.find((cat) => cat.id === expense.category);
               return (
-                <div key={expense.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div
+                  key={expense.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                >
                   <div className="flex items-center space-x-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${category?.color}`}>
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${category?.color}`}
+                    >
                       <span className="text-lg">{category?.icon}</span>
                     </div>
                     <div>
