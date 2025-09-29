@@ -21,7 +21,17 @@ interface Category {
 }
 
 export default function ExpenseTrackingPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return JSON.parse(localStorage.getItem("expenses") || "[]");
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -41,19 +51,7 @@ export default function ExpenseTrackingPage() {
     { id: "other", name: "Other", icon: "📦", color: "bg-gray-100 text-gray-800" },
   ];
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("expenses");
-    if (saved) {
-      try {
-        setExpenses(JSON.parse(saved));
-      } catch {
-        setExpenses([]);
-      }
-    }
-  }, []);
-
-  // Save to localStorage whenever expenses change
+  // keep localStorage in sync
   useEffect(() => {
     localStorage.setItem("expenses", JSON.stringify(expenses));
   }, [expenses]);
@@ -75,7 +73,7 @@ export default function ExpenseTrackingPage() {
     setAmount("");
     setDescription("");
     setSelectedCategory("");
-    setExpenseDate(new Date().toISOString().split("T")[0]); // reset to today as a default value for a "new expense"
+    setExpenseDate(new Date().toISOString().split("T")[0]);
     setShowAddForm(false);
   };
 
