@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import api from "@/utils/api";
 
 interface Expense {
   id: string;
@@ -33,6 +34,8 @@ export default function ExpenseTrackingPage() {
   });
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [amount, setAmount] = useState("");
@@ -43,57 +46,210 @@ export default function ExpenseTrackingPage() {
   );
 
   const categories: Category[] = [
-    { id: "food", name: "Food & Dining", icon: "🍽️", color: "bg-orange-100 text-orange-800" },
-    { id: "transport", name: "Transportation", icon: "🚗", color: "bg-blue-100 text-blue-800" },
-    { id: "entertainment", name: "Entertainment", icon: "🎬", color: "bg-purple-100 text-purple-800" },
-    { id: "supplies", name: "School Supplies", icon: "📚", color: "bg-green-100 text-green-800" },
-    { id: "utilities", name: "Utilities", icon: "⚡", color: "bg-yellow-100 text-yellow-800" },
-    { id: "other", name: "Other", icon: "📦", color: "bg-gray-100 text-gray-800" },
+    { id: "Food", name: "Food", icon: "🍽️", color: "bg-orange-100 text-orange-800" },
+    { id: "Transportation", name: "Transportation", icon: "🚗", color: "bg-blue-100 text-blue-800" },
+    { id: "Recreation", name: "Recreation", icon: "🎬", color: "bg-purple-100 text-purple-800" },
+    { id: "Housing", name: "Housing", icon: "🏠", color: "bg-red-100 text-red-800" },
+    { id: "Utilities", name: "Utilities", icon: "⚡", color: "bg-yellow-100 text-yellow-800" },
+    { id: "Personal Care", name: "Personal Care", icon: "🧴", color: "bg-pink-100 text-pink-800" },
+    { id: "Saving", name: "Saving", icon: "💰", color: "bg-emerald-100 text-emerald-800" },
+    { id: "Debts", name: "Debts", icon: "💳", color: "bg-red-100 text-red-800" },
+    { id: "Clothing", name: "Clothing", icon: "👕", color: "bg-indigo-100 text-indigo-800" },
+    { id: "Paycheck", name: "Paycheck", icon: "💵", color: "bg-green-100 text-green-800" },
   ];
+  // Load expenses from backend on mount (fallback to localStorage if unauthenticated or error)
+  useEffect(() => {
+    const loadExpenses = async () => {
+      try {
+        const token = api.getToken();
+        if (!token) {
+          const saved = localStorage.getItem("expenses");
+          if (saved) {
+            try {
+              setExpenses(JSON.parse(saved));
+            } catch {
+              setExpenses([]);
+            }
+          }
+          return;
+        }
 
-  // keep localStorage in sync
+        const response = await api.get('expenses/?limit=100');
+        const data = await response.json();
+
+        const frontendExpenses: Expense[] = data.expenses.map((expense: any) => ({
+          id: expense.id,
+          amount: expense.amount_dollars,
+          category: expense.category,
+          description: expense.description || "",
+          date: expense.created_at.split("T")[0],
+          type: "personal",
+        }));
+        setExpenses(frontendExpenses);
+      } catch (error) {
+        console.error('Error loading expenses:', error);
+        const saved = localStorage.getItem("expenses");
+        if (saved) {
+          try {
+            setExpenses(JSON.parse(saved));
+          } catch {
+            setExpenses([]);
+          }
+        }
+      }
+    };
+
+    loadExpenses();
+  }, []);
+
+  // Save to localStorage whenever expenses change
   useEffect(() => {
     localStorage.setItem("expenses", JSON.stringify(expenses));
   }, [expenses]);
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !selectedCategory || !description || !expenseDate) return;
 
-    const newExpense: Expense = {
-      id: Date.now().toString(),
-      amount: parseFloat(amount),
-      category: selectedCategory,
-      description,
-      date: expenseDate,
-      type: expenseType,
-    };
+    try {
+      const token = api.getToken();
+      if (!token) {
+        alert('Please log in to add expenses');
+        return;
+      }
 
-    setExpenses([newExpense, ...expenses]);
-    setAmount("");
-    setDescription("");
-    setSelectedCategory("");
-    setExpenseDate(new Date().toISOString().split("T")[0]);
-    setShowAddForm(false);
+      if (isEditing && editingExpenseId) {
+        const updateData = {
+          amount_dollars: parseFloat(amount),
+          credit: false,
+          category: selectedCategory,
+          description,
+          created_at: expenseDate,
+        };
+        const response = await api.put(`expenses/${editingExpenseId}`, updateData);
+        const updated = await response.json();
+
+        setExpenses((prev) =>
+          prev.map((exp) =>
+            exp.id === editingExpenseId
+              ? {
+                  ...exp,
+                  amount: updated.amount_dollars,
+                  category: updated.category,
+                  description: updated.description || "",
+                  date: expenseDate,
+                }
+              : exp
+          )
+        );
+      } else {
+        const expenseData = {
+          amount_dollars: parseFloat(amount),
+          credit: false,
+          category: selectedCategory,
+          description,
+          created_at: expenseDate,
+        };
+
+        const response = await api.post('expenses/', expenseData);
+        const createdExpense = await response.json();
+
+        const newExpense: Expense = {
+          id: createdExpense.id,
+          amount: createdExpense.amount_dollars,
+          category: createdExpense.category,
+          description: createdExpense.description || "",
+          date: expenseDate,
+          type: expenseType,
+        };
+
+        setExpenses([newExpense, ...expenses]);
+      }
+
+      setAmount("");
+      setDescription("");
+      setSelectedCategory("");
+      setExpenseDate(new Date().toISOString().split("T")[0]);
+      setShowAddForm(false);
+      setIsEditing(false);
+      setEditingExpenseId(null);
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      alert('Failed to create expense. Please try again.');
+    }
   };
 
-  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Simulate OCR processing
-    setTimeout(() => {
-      const mockOCRResult: Expense = {
-        id: Date.now().toString(),
-        amount: 15.99,
-        category: "food",
-        description: "Coffee and pastry from campus cafe",
-        date: new Date().toISOString().split("T")[0],
-        type: "personal",
-      };
-      setExpenses([mockOCRResult, ...expenses]);
-      setShowUploadForm(false);
-    }, 2000);
+    try {
+      // For now, simulate OCR processing and create an expense
+      // TODO: Implement actual OCR processing or file upload to backend
+      setTimeout(async () => {
+        try {
+          // Check if user is authenticated
+          const token = api.getToken();
+          if (!token) {
+            alert('Please log in to upload receipts');
+            return;
+          }
+
+          const mockOCRData = {
+            amount_dollars: 15.99,
+            credit: false,
+            category: "Food", // Use database category
+            description: "Coffee and pastry from campus cafe"
+            // metadata removed until database column is added
+          };
+
+          const response = await api.post('expenses/', mockOCRData);
+          const createdExpense = await response.json();
+          const newExpense: Expense = {
+            id: createdExpense.id, // ID is already a string
+            amount: createdExpense.amount_dollars,
+            category: createdExpense.category,
+            description: createdExpense.description || "",
+            date: new Date().toISOString().split("T")[0],
+            type: "personal",
+          };
+          setExpenses([newExpense, ...expenses]);
+          setShowUploadForm(false);
+        } catch (error) {
+          console.error('Error creating expense from receipt:', error);
+          alert('Failed to process receipt. Please try again.');
+        }
+      }, 2000);
+    } catch (error) {
+      console.error('Error processing receipt:', error);
+      alert('Failed to process receipt. Please try again.');
+    }
+  };
+
+  const handleEditClick = (expense: Expense) => {
+    setIsEditing(true);
+    setEditingExpenseId(expense.id);
+    setAmount(String(expense.amount));
+    setSelectedCategory(expense.category);
+    setDescription(expense.description);
+    setExpenseDate(expense.date);
+    setShowAddForm(true);
+  };
+
+  const handleDeleteClick = async (expenseId: string) => {
+    if (!confirm('Delete this expense?')) return;
+    try {
+      const token = api.getToken();
+      if (!token) {
+        alert('Please log in to delete expenses');
+        return;
+      }
+      await api.delete(`expenses/${expenseId}`);
+      setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      alert('Failed to delete expense. Please try again.');
+    }
   };
 
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -267,7 +423,7 @@ export default function ExpenseTrackingPage() {
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setShowAddForm(false)}
+                onClick={() => { setShowAddForm(false); setIsEditing(false); setEditingExpenseId(null); }}
                 className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
               >
                 Cancel
@@ -276,7 +432,7 @@ export default function ExpenseTrackingPage() {
                 type="submit"
                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
               >
-                Add Expense
+                {isEditing ? 'Save Changes' : 'Add Expense'}
               </button>
             </div>
           </form>
@@ -349,7 +505,9 @@ export default function ExpenseTrackingPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="flex items-center space-x-3">
+                    <button onClick={() => handleEditClick(expense)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Edit</button>
+                    <button onClick={() => handleDeleteClick(expense.id)} className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">Delete</button>
                     <p className="font-bold text-gray-900 dark:text-white">${expense.amount.toFixed(2)}</p>
                   </div>
                 </div>

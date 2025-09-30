@@ -11,6 +11,12 @@ def get_supabase_client() -> Client:
     """Get Supabase client instance"""
     return supabase
 
+def get_authenticated_client(access_token: str) -> Client:
+    """Get Supabase client authenticated with user token"""
+    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_PUBLIC_KEY)
+    client.auth.set_session(access_token, "")
+    return client
+
 def test_connection():
     """Test Supabase connection"""
     # No-op to avoid version-specific client issues during startup

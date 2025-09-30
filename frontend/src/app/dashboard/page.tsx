@@ -18,6 +18,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import api from "@/utils/api";
 
 // Import feature components
 import ExpenseTrackingPage from "./features/expense-tracking/page";
@@ -33,6 +34,8 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FeatureTab>('overview');
+  const [monthlyExpensesTotal, setMonthlyExpensesTotal] = useState<number>(0);
+  const [overallExpensesTotal, setOverallExpensesTotal] = useState<number>(0);
 
   useEffect(() => {
     // Check if user is logged in and verify token
@@ -48,6 +51,42 @@ export default function Dashboard() {
     }
     
     setIsLoading(false);
+  }, []);
+
+  // Load this month's expenses total from backend
+  useEffect(() => {
+    const fetchMonthlyExpenses = async () => {
+      try {
+        const token = api.getToken();
+        if (!token) return;
+        const response = await api.get(`expenses/sum/monthly`);
+        const data = await response.json();
+        const total = typeof data.total_amount === 'number' ? data.total_amount : 0;
+        setMonthlyExpensesTotal(total);
+      } catch (err) {
+        console.error('Failed to fetch monthly expenses total:', err);
+      }
+    };
+
+    fetchMonthlyExpenses();
+  }, []);
+
+  // Load overall expenses total from backend
+  useEffect(() => {
+    const fetchOverallExpenses = async () => {
+      try {
+        const token = api.getToken();
+        if (!token) return;
+        const response = await api.get(`expenses/sum/overall`);
+        const data = await response.json();
+        const total = typeof data.total_amount === 'number' ? data.total_amount : 0;
+        setOverallExpensesTotal(total);
+      } catch (err) {
+        console.error('Failed to fetch overall expenses total:', err);
+      }
+    };
+
+    fetchOverallExpenses();
   }, []);
 
   const handleLogout = async () => {
@@ -87,8 +126,8 @@ export default function Dashboard() {
                     <span className="text-2xl">💰</span>
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-300">Total Balance</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">$0.00</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Total Expenses</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">${overallExpensesTotal.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
@@ -112,7 +151,7 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm text-gray-600 dark:text-gray-300">Monthly Expenses</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">$0.00</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">${monthlyExpensesTotal.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
