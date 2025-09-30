@@ -22,7 +22,17 @@ interface Expense {
 }
 
 export default function SharedWishlistPage() {
-  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return JSON.parse(localStorage.getItem("wishlist") || "[]");
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
   const [newItem, setNewItem] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedList, setSelectedList] = useState("personal");
@@ -43,19 +53,7 @@ export default function SharedWishlistPage() {
     { id: "other", name: "Other", icon: "📦" },
   ];
 
-  // Load from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("wishlist");
-    if (saved) {
-      try {
-        setWishlist(JSON.parse(saved));
-      } catch {
-        setWishlist([]);
-      }
-    }
-  }, []);
-
-  // Save to localStorage
+  // Persist wishlist to localStorage
   useEffect(() => {
     localStorage.setItem("wishlist", JSON.stringify(wishlist));
   }, [wishlist]);
@@ -83,7 +81,10 @@ export default function SharedWishlistPage() {
   };
 
   const handleMoveToExpenses = () => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0) {
+      alert("Please select at least one item to move.");
+      return;
+    }
     setDate(new Date().toISOString().split("T")[0]);
     setShowMoveForm(true);
   };
@@ -121,8 +122,24 @@ export default function SharedWishlistPage() {
   };
 
   const handleDelete = () => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0) {
+      alert("Please select at least one item to delete.");
+      return;
+    }
     setWishlist((prev) => prev.filter((w) => !selectedIds.includes(w.id)));
+    setSelectedIds([]);
+  };
+
+  const handleMarkAsPurchased = () => {
+    if (selectedIds.length === 0) {
+      alert("Please select at least one item to mark as purchased.");
+      return;
+    }
+    setWishlist((prev) =>
+      prev.map((w) =>
+        selectedIds.includes(w.id) ? { ...w, purchased: true } : w
+      )
+    );
     setSelectedIds([]);
   };
 
@@ -138,7 +155,7 @@ export default function SharedWishlistPage() {
           </p>
         </div>
         <Link
-          href="/dashboard"
+          href="/dashboard/features/groups"
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
         >
           Manage Groups
@@ -280,24 +297,21 @@ export default function SharedWishlistPage() {
           <div className="text-center py-8 text-gray-500">No items yet</div>
         ) : (
           <div className="space-y-3">
-            {wishlist.map((item) => (
-              <div
-                key={item.id}
-                className={`flex items-center justify-between p-4 rounded-lg ${
-                  item.purchased
-                    ? "bg-gray-100 dark:bg-gray-700 opacity-60"
-                    : "bg-gray-50 dark:bg-gray-700"
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  {!item.purchased && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(item.id)}
-                      onChange={() => toggleSelect(item.id)}
-                      className="h-4 w-4"
-                    />
-                  )}
+            {wishlist.map((item) => {
+              const isSelected = selectedIds.includes(item.id);
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => toggleSelect(item.id)}
+                  className={`flex items-center justify-between p-4 rounded-lg cursor-pointer transition 
+                    ${
+                      isSelected
+                        ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900"
+                        : item.purchased
+                        ? "bg-gray-100 dark:bg-gray-700 opacity-60"
+                        : "bg-gray-50 dark:bg-gray-700"
+                    }`}
+                >
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">
                       {item.name}
@@ -308,34 +322,38 @@ export default function SharedWishlistPage() {
                       </p>
                     )}
                   </div>
+                  {item.purchased && (
+                    <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      Purchased
+                    </span>
+                  )}
                 </div>
-                {item.purchased && (
-                  <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-                    Purchased
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
-        {wishlist.length > 0 && (
-          <div className="mt-4 flex justify-end space-x-3">
-            <button
-              onClick={handleDelete}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-              disabled={selectedIds.length === 0}
-            >
-              🗑️ Delete Selected
-            </button>
-            <button
-              onClick={handleMoveToExpenses}
-              className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-              disabled={selectedIds.length === 0}
-            >
-              📊 Move to Expenses
-            </button>
-          </div>
-        )}
+
+        {/* Always visible actions */}
+        <div className="mt-4 flex justify-end space-x-3">
+          <button
+            onClick={handleMarkAsPurchased}
+            className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
+          >
+            ✅ Mark as Purchased
+          </button>
+          <button
+            onClick={handleDelete}
+            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+          >
+            🗑️ Delete Selected
+          </button>
+          <button
+            onClick={handleMoveToExpenses}
+            className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            📊 Move to Expenses
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -22,7 +22,17 @@ interface Category {
 }
 
 export default function ExpenseTrackingPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return JSON.parse(localStorage.getItem("expenses") || "[]");
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -45,15 +55,12 @@ export default function ExpenseTrackingPage() {
     { id: "Clothing", name: "Clothing", icon: "👕", color: "bg-indigo-100 text-indigo-800" },
     { id: "Paycheck", name: "Paycheck", icon: "💵", color: "bg-green-100 text-green-800" },
   ];
-
-  // Load expenses from backend on mount
+  // Load expenses from backend on mount (fallback to localStorage if unauthenticated or error)
   useEffect(() => {
     const loadExpenses = async () => {
       try {
-        // Check if user is authenticated
         const token = api.getToken();
         if (!token) {
-          // Fallback to localStorage if no token
           const saved = localStorage.getItem("expenses");
           if (saved) {
             try {
@@ -67,21 +74,18 @@ export default function ExpenseTrackingPage() {
 
         const response = await api.get('expenses/?limit=100');
         const data = await response.json();
-        
-        // Convert backend expenses to frontend format
-            const frontendExpenses: Expense[] = data.expenses.map((expense: any) => ({
-              id: expense.id, // ID is already a string
-              amount: expense.amount_dollars,
-              category: expense.category,
-              description: expense.description || "",
-              date: expense.created_at.split("T")[0], // Use created_at since no metadata
-              type: "personal", // Default to personal since no metadata
-            }));
+
+        const frontendExpenses: Expense[] = data.expenses.map((expense: any) => ({
+          id: expense.id,
+          amount: expense.amount_dollars,
+          category: expense.category,
+          description: expense.description || "",
+          date: expense.created_at.split("T")[0],
+          type: "personal",
+        }));
         setExpenses(frontendExpenses);
-        
       } catch (error) {
         console.error('Error loading expenses:', error);
-        // Fallback to localStorage if backend fails
         const saved = localStorage.getItem("expenses");
         if (saved) {
           try {
@@ -106,49 +110,39 @@ export default function ExpenseTrackingPage() {
     if (!amount || !selectedCategory || !description || !expenseDate) return;
 
     try {
-      // Check if user is authenticated
       const token = api.getToken();
       if (!token) {
         alert('Please log in to add expenses');
         return;
       }
 
-      // Prepare the expense data for the backend
       const expenseData = {
         amount_dollars: parseFloat(amount),
-        credit: false, // Assuming expenses are debits by default
+        credit: false,
         category: selectedCategory,
-        description
-        // metadata removed until database column is added
+        description,
       };
 
-      // Call the backend API
       const response = await api.post('expenses/', expenseData);
       const createdExpense = await response.json();
 
-      // Create a local expense object for the UI
       const newExpense: Expense = {
-        id: createdExpense.id, // ID is already a string
+        id: createdExpense.id,
         amount: createdExpense.amount_dollars,
         category: createdExpense.category,
         description: createdExpense.description || "",
-        date: expenseDate, // Use the date from the form
-        type: expenseType, // Use the type from the form
+        date: expenseDate,
+        type: expenseType,
       };
 
-      // Update local state
       setExpenses([newExpense, ...expenses]);
-      
-      // Reset form
       setAmount("");
       setDescription("");
       setSelectedCategory("");
       setExpenseDate(new Date().toISOString().split("T")[0]);
       setShowAddForm(false);
-
     } catch (error) {
       console.error('Error creating expense:', error);
-      // TODO: Add user-friendly error handling (toast notification, etc.)
       alert('Failed to create expense. Please try again.');
     }
   };
