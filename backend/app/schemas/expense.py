@@ -10,7 +10,7 @@ class ExpenseBase(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 class ExpenseCreate(ExpenseBase):
-    user_id: str
+    pass  # user_id will be extracted from JWT token
 
 class ExpenseUpdate(BaseModel):
     amount_dollars: Optional[float] = None
@@ -20,10 +20,10 @@ class ExpenseUpdate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 class ExpenseResponse(ExpenseBase):
-    id: int
+    id: str  # Changed from int to str since database uses UUID
     user_id: str
     created_at: str
-    updated_at: str
+    updated_at: Optional[str] = None  # Made optional since it might be None
 
     class Config:
         from_attributes = True

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import api from "@/utils/api";
 
 interface Expense {
   id: string;
@@ -33,24 +34,66 @@ export default function ExpenseTrackingPage() {
   );
 
   const categories: Category[] = [
-    { id: "food", name: "Food & Dining", icon: "🍽️", color: "bg-orange-100 text-orange-800" },
-    { id: "transport", name: "Transportation", icon: "🚗", color: "bg-blue-100 text-blue-800" },
-    { id: "entertainment", name: "Entertainment", icon: "🎬", color: "bg-purple-100 text-purple-800" },
-    { id: "supplies", name: "School Supplies", icon: "📚", color: "bg-green-100 text-green-800" },
-    { id: "utilities", name: "Utilities", icon: "⚡", color: "bg-yellow-100 text-yellow-800" },
-    { id: "other", name: "Other", icon: "📦", color: "bg-gray-100 text-gray-800" },
+    { id: "Food", name: "Food", icon: "🍽️", color: "bg-orange-100 text-orange-800" },
+    { id: "Transportation", name: "Transportation", icon: "🚗", color: "bg-blue-100 text-blue-800" },
+    { id: "Recreation", name: "Recreation", icon: "🎬", color: "bg-purple-100 text-purple-800" },
+    { id: "Housing", name: "Housing", icon: "🏠", color: "bg-red-100 text-red-800" },
+    { id: "Utilities", name: "Utilities", icon: "⚡", color: "bg-yellow-100 text-yellow-800" },
+    { id: "Personal Care", name: "Personal Care", icon: "🧴", color: "bg-pink-100 text-pink-800" },
+    { id: "Saving", name: "Saving", icon: "💰", color: "bg-emerald-100 text-emerald-800" },
+    { id: "Debts", name: "Debts", icon: "💳", color: "bg-red-100 text-red-800" },
+    { id: "Clothing", name: "Clothing", icon: "👕", color: "bg-indigo-100 text-indigo-800" },
+    { id: "Paycheck", name: "Paycheck", icon: "💵", color: "bg-green-100 text-green-800" },
   ];
 
-  // Load from localStorage on mount
+  // Load expenses from backend on mount
   useEffect(() => {
-    const saved = localStorage.getItem("expenses");
-    if (saved) {
+    const loadExpenses = async () => {
       try {
-        setExpenses(JSON.parse(saved));
-      } catch {
-        setExpenses([]);
+        // Check if user is authenticated
+        const token = api.getToken();
+        if (!token) {
+          // Fallback to localStorage if no token
+          const saved = localStorage.getItem("expenses");
+          if (saved) {
+            try {
+              setExpenses(JSON.parse(saved));
+            } catch {
+              setExpenses([]);
+            }
+          }
+          return;
+        }
+
+        const response = await api.get('expenses/?limit=100');
+        const data = await response.json();
+        
+        // Convert backend expenses to frontend format
+            const frontendExpenses: Expense[] = data.expenses.map((expense: any) => ({
+              id: expense.id, // ID is already a string
+              amount: expense.amount_dollars,
+              category: expense.category,
+              description: expense.description || "",
+              date: expense.created_at.split("T")[0], // Use created_at since no metadata
+              type: "personal", // Default to personal since no metadata
+            }));
+        setExpenses(frontendExpenses);
+        
+      } catch (error) {
+        console.error('Error loading expenses:', error);
+        // Fallback to localStorage if backend fails
+        const saved = localStorage.getItem("expenses");
+        if (saved) {
+          try {
+            setExpenses(JSON.parse(saved));
+          } catch {
+            setExpenses([]);
+          }
+        }
       }
-    }
+    };
+
+    loadExpenses();
   }, []);
 
   // Save to localStorage whenever expenses change
@@ -58,44 +101,103 @@ export default function ExpenseTrackingPage() {
     localStorage.setItem("expenses", JSON.stringify(expenses));
   }, [expenses]);
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !selectedCategory || !description || !expenseDate) return;
 
-    const newExpense: Expense = {
-      id: Date.now().toString(),
-      amount: parseFloat(amount),
-      category: selectedCategory,
-      description,
-      date: expenseDate,
-      type: expenseType,
-    };
+    try {
+      // Check if user is authenticated
+      const token = api.getToken();
+      if (!token) {
+        alert('Please log in to add expenses');
+        return;
+      }
 
-    setExpenses([newExpense, ...expenses]);
-    setAmount("");
-    setDescription("");
-    setSelectedCategory("");
-    setExpenseDate(new Date().toISOString().split("T")[0]); // reset to today as a default value for a "new expense"
-    setShowAddForm(false);
+      // Prepare the expense data for the backend
+      const expenseData = {
+        amount_dollars: parseFloat(amount),
+        credit: false, // Assuming expenses are debits by default
+        category: selectedCategory,
+        description
+        // metadata removed until database column is added
+      };
+
+      // Call the backend API
+      const response = await api.post('expenses/', expenseData);
+      const createdExpense = await response.json();
+
+      // Create a local expense object for the UI
+      const newExpense: Expense = {
+        id: createdExpense.id, // ID is already a string
+        amount: createdExpense.amount_dollars,
+        category: createdExpense.category,
+        description: createdExpense.description || "",
+        date: expenseDate, // Use the date from the form
+        type: expenseType, // Use the type from the form
+      };
+
+      // Update local state
+      setExpenses([newExpense, ...expenses]);
+      
+      // Reset form
+      setAmount("");
+      setDescription("");
+      setSelectedCategory("");
+      setExpenseDate(new Date().toISOString().split("T")[0]);
+      setShowAddForm(false);
+
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      // TODO: Add user-friendly error handling (toast notification, etc.)
+      alert('Failed to create expense. Please try again.');
+    }
   };
 
-  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Simulate OCR processing
-    setTimeout(() => {
-      const mockOCRResult: Expense = {
-        id: Date.now().toString(),
-        amount: 15.99,
-        category: "food",
-        description: "Coffee and pastry from campus cafe",
-        date: new Date().toISOString().split("T")[0],
-        type: "personal",
-      };
-      setExpenses([mockOCRResult, ...expenses]);
-      setShowUploadForm(false);
-    }, 2000);
+    try {
+      // For now, simulate OCR processing and create an expense
+      // TODO: Implement actual OCR processing or file upload to backend
+      setTimeout(async () => {
+        try {
+          // Check if user is authenticated
+          const token = api.getToken();
+          if (!token) {
+            alert('Please log in to upload receipts');
+            return;
+          }
+
+          const mockOCRData = {
+            amount_dollars: 15.99,
+            credit: false,
+            category: "Food", // Use database category
+            description: "Coffee and pastry from campus cafe"
+            // metadata removed until database column is added
+          };
+
+          const response = await api.post('expenses/', mockOCRData);
+          const createdExpense = await response.json();
+          const newExpense: Expense = {
+            id: createdExpense.id, // ID is already a string
+            amount: createdExpense.amount_dollars,
+            category: createdExpense.category,
+            description: createdExpense.description || "",
+            date: new Date().toISOString().split("T")[0],
+            type: "personal",
+          };
+          setExpenses([newExpense, ...expenses]);
+          setShowUploadForm(false);
+        } catch (error) {
+          console.error('Error creating expense from receipt:', error);
+          alert('Failed to process receipt. Please try again.');
+        }
+      }, 2000);
+    } catch (error) {
+      console.error('Error processing receipt:', error);
+      alert('Failed to process receipt. Please try again.');
+    }
   };
 
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);

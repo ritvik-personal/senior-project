@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import date
 import logging
 
-from app.database import get_supabase_client
+from app.database import get_supabase_client, get_authenticated_client
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +13,22 @@ TABLE_NAME = "expenses"
 def _table():
     return get_supabase_client().table(TABLE_NAME)
 
+def _authenticated_table(access_token: str):
+    return get_authenticated_client(access_token).table(TABLE_NAME)
+
+def _map_expense_fields(expense_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Map database fields to schema fields"""
+    return {
+        "id": str(expense_data.get("expense_id", "")),  # Map expense_id to id, ensure string
+        "user_id": expense_data.get("user_id"),
+        "amount_dollars": expense_data.get("amount"),  # Map amount to amount_dollars
+        "credit": expense_data.get("credit"),
+        "category": expense_data.get("category"),
+        "description": expense_data.get("notes"),  # Map notes to description
+        "created_at": expense_data.get("created_at"),
+        "updated_at": expense_data.get("updated_at"),  # Can be None, schema handles it
+    }
+
 
 def create_expense(
     user_id: str,
@@ -21,6 +37,7 @@ def create_expense(
     category: str,
     description: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    access_token: Optional[str] = None,
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "user_id": user_id,
@@ -30,13 +47,22 @@ def create_expense(
     }
     if description is not None:
         payload["notes"] = description
-    if metadata is not None:
-        payload["metadata"] = metadata
+    # Skip metadata for now since column doesn't exist in schema
+    # if metadata is not None:
+    #     payload["metadata"] = metadata
 
     logger.debug("Inserting expense payload=%s", payload)
-    resp = _table().insert(payload).select("*").execute()
+    
+    # Use authenticated client if token is provided
+    if access_token:
+        resp = _authenticated_table(access_token).insert(payload).execute()
+    else:
+        resp = _table().insert(payload).execute()
+        
     if resp.data:
-        return resp.data[0]
+        expense_data = resp.data[0]
+        logger.debug("Database returned: %s", expense_data)
+        return _map_expense_fields(expense_data)
     raise RuntimeError(f"Failed to insert expense: {resp}")
 
 
@@ -44,13 +70,17 @@ def get_expense_by_category_and_user(category: str, user_id: str) -> Optional[Di
     ##Change * depending on what we actually may need to work with.
     query = _table().select("*").eq(["category"], [category]).eq(["user_id"], [user_id])
     resp = query.single().execute()
-    return resp.data
+    if resp.data:
+        return _map_expense_fields(resp.data)
+    return None
 
-def get_expense_by_id(expense_id: int) -> Optional[Dict[str, Any]]:
+def get_expense_by_id(expense_id: str) -> Optional[Dict[str, Any]]:
     ##Change * depending on what we actually may need to work with.
-    query = _table().select("*").eq(["id"], [expense_id])
+    query = _table().select("*").eq(["expense_id"], [expense_id])  # Use expense_id instead of id
     resp = query.single().execute()
-    return resp.data
+    if resp.data:
+        return _map_expense_fields(resp.data)
+    return None
 
 
 
@@ -77,11 +107,13 @@ def list_expenses(
     else:
         query = query.limit(limit)
     resp = query.execute()
-    return resp.data or []
+    if resp.data:
+        return [_map_expense_fields(expense) for expense in resp.data]
+    return []
 
 
 def update_expense(
-    expense_id: int,
+    expense_id: str,
     updates: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
     clean_updates: Dict[str, Any] = {}
@@ -93,15 +125,15 @@ def update_expense(
                 clean_updates[key] = value
 
     if not clean_updates:
-        return get_expense_by_id(expense_id, user_id=user_id)
+        return get_expense_by_id(expense_id)
 
-    resp = _table().update(clean_updates).eq("id", expense_id).select("*").execute()
+    resp = _table().update(clean_updates).eq("expense_id", expense_id).select("*").execute()  # Use expense_id
     if resp.data:
-        return resp.data[0]
+        return _map_expense_fields(resp.data[0])
     return None
 
 
-def delete_expense(expense_id: int) -> bool:
+def delete_expense(expense_id: str) -> bool:
     resp = _table().delete().eq("expense_id", expense_id)
     # Supabase returns the deleted rows when RLS allows select on delete; otherwise check count
     if isinstance(resp.data, list):
