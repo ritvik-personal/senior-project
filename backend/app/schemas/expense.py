@@ -10,7 +10,8 @@ class ExpenseBase(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 class ExpenseCreate(ExpenseBase):
-    pass  # user_id will be extracted from JWT token
+    # Optional: allow client to set created_at (e.g., from a date picker)
+    created_at: Optional[date] = None  # user_id will be extracted from JWT token
 
 class ExpenseUpdate(BaseModel):
     amount_dollars: Optional[float] = None
@@ -18,6 +19,7 @@ class ExpenseUpdate(BaseModel):
     category: Optional[str] = None
     description: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    created_at: Optional[date] = None
 
 class ExpenseResponse(ExpenseBase):
     id: str  # Changed from int to str since database uses UUID

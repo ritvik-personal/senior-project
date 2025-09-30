@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import date
+from datetime import date, timedelta
 import logging
 
 from app.database import get_supabase_client, get_authenticated_client
@@ -38,6 +38,7 @@ def create_expense(
     description: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
     access_token: Optional[str] = None,
+    created_at: Optional[date] = None,
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "user_id": user_id,
@@ -47,6 +48,9 @@ def create_expense(
     }
     if description is not None:
         payload["notes"] = description
+    if created_at is not None:
+        # Store as ISO date string; backend column `created_at` can accept date/timestamp
+        payload["created_at"] = created_at.isoformat()
     # Skip metadata for now since column doesn't exist in schema
     # if metadata is not None:
     #     payload["metadata"] = metadata
@@ -92,14 +96,18 @@ def list_expenses(
     limit: int = 100,
     offset: int = 0,
     order_desc: bool = True,
+    access_token: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    query = _table().select("*").eq("user_id", user_id)
+    table = _authenticated_table(access_token) if access_token else _table()
+    query = table.select("*").eq("user_id", user_id)
     if category:
         query = query.eq("category", category)
     if start_date:
         query = query.gte("created_at", start_date.isoformat())
     if end_date:
-        query = query.lte("created_at", end_date.isoformat())
+        # Include entire end_date by using < (next day)
+        inclusive_end = end_date + timedelta(days=1)
+        query = query.lt("created_at", inclusive_end.isoformat())
     order_col = "created_at"
     query = query.order(order_col, desc=order_desc)
     if offset:
@@ -115,30 +123,46 @@ def list_expenses(
 def update_expense(
     expense_id: str,
     updates: Dict[str, Any],
+    access_token: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     clean_updates: Dict[str, Any] = {}
     for key, value in updates.items():
-        if key in {"amount", "credit", "category", "notes", "metadata", "created_at"}:
-            if key == "created_at" and isinstance(value, date):
+        # Map API schema keys to DB columns
+        if key == "amount_dollars":
+            clean_updates["amount"] = value
+        elif key == "description":
+            clean_updates["notes"] = value
+        elif key in {"credit", "category"}:
+            clean_updates[key] = value
+        elif key == "created_at":
+            if isinstance(value, date):
                 clean_updates[key] = value.isoformat()
-            else:
+            elif isinstance(value, str):
                 clean_updates[key] = value
 
     if not clean_updates:
         return get_expense_by_id(expense_id)
 
-    resp = _table().update(clean_updates).eq("expense_id", expense_id).select("*").execute()  # Use expense_id
-    if resp.data:
-        return _map_expense_fields(resp.data[0])
-    return None
+    table = _authenticated_table(access_token) if access_token else _table()
+    try:
+        resp = table.update(clean_updates).eq("expense_id", expense_id).execute()  # Use expense_id
+        if resp.data:
+            return _map_expense_fields(resp.data[0])
+        return None
+    except Exception as exc:
+        logger.error("Update expense failed: %s", exc)
+        return None
 
 
-def delete_expense(expense_id: str) -> bool:
-    resp = _table().delete().eq("expense_id", expense_id)
-    # Supabase returns the deleted rows when RLS allows select on delete; otherwise check count
+def delete_expense(
+    expense_id: str,
+    access_token: Optional[str] = None,
+) -> bool:
+    table = _authenticated_table(access_token) if access_token else _table()
+    resp = table.delete().eq("expense_id", expense_id).execute()
+    # If RLS disallows returning rows on delete, data may be None even when successful
     if isinstance(resp.data, list):
         return len(resp.data) > 0
-    # Fallback: if no data, consider success when no error was thrown
     return True
 
 
@@ -147,12 +171,15 @@ def sum_expenses(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     category: Optional[str] = None,
+    access_token: Optional[str] = None,
 ) -> int:
-    query = _table().select("amount", head=False).eq("user_id", user_id)
+    table = _authenticated_table(access_token) if access_token else _table()
+    query = table.select("amount", head=False).eq("user_id", user_id)
     if start_date:
         query = query.gte("created_at", start_date.isoformat())
     if end_date:
-        query = query.lte("created_at", end_date.isoformat())
+        inclusive_end = end_date + timedelta(days=1)
+        query = query.lt("created_at", inclusive_end.isoformat())
     if category:
         query = query.eq("category", category)
     resp = query.execute()
@@ -160,7 +187,8 @@ def sum_expenses(
     total = 0
     for row in rows:
         try:
-            total += int(row.get("amount", 0))
+            # amount may be float/decimal
+            total += float(row.get("amount", 0))
         except (TypeError, ValueError):
             continue
     return total

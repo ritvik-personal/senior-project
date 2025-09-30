@@ -34,6 +34,8 @@ export default function ExpenseTrackingPage() {
   });
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [amount, setAmount] = useState("");
@@ -116,31 +118,61 @@ export default function ExpenseTrackingPage() {
         return;
       }
 
-      const expenseData = {
-        amount_dollars: parseFloat(amount),
-        credit: false,
-        category: selectedCategory,
-        description,
-      };
+      if (isEditing && editingExpenseId) {
+        const updateData = {
+          amount_dollars: parseFloat(amount),
+          credit: false,
+          category: selectedCategory,
+          description,
+          created_at: expenseDate,
+        };
+        const response = await api.put(`expenses/${editingExpenseId}`, updateData);
+        const updated = await response.json();
 
-      const response = await api.post('expenses/', expenseData);
-      const createdExpense = await response.json();
+        setExpenses((prev) =>
+          prev.map((exp) =>
+            exp.id === editingExpenseId
+              ? {
+                  ...exp,
+                  amount: updated.amount_dollars,
+                  category: updated.category,
+                  description: updated.description || "",
+                  date: expenseDate,
+                }
+              : exp
+          )
+        );
+      } else {
+        const expenseData = {
+          amount_dollars: parseFloat(amount),
+          credit: false,
+          category: selectedCategory,
+          description,
+          created_at: expenseDate,
+        };
 
-      const newExpense: Expense = {
-        id: createdExpense.id,
-        amount: createdExpense.amount_dollars,
-        category: createdExpense.category,
-        description: createdExpense.description || "",
-        date: expenseDate,
-        type: expenseType,
-      };
+        const response = await api.post('expenses/', expenseData);
+        const createdExpense = await response.json();
 
-      setExpenses([newExpense, ...expenses]);
+        const newExpense: Expense = {
+          id: createdExpense.id,
+          amount: createdExpense.amount_dollars,
+          category: createdExpense.category,
+          description: createdExpense.description || "",
+          date: expenseDate,
+          type: expenseType,
+        };
+
+        setExpenses([newExpense, ...expenses]);
+      }
+
       setAmount("");
       setDescription("");
       setSelectedCategory("");
       setExpenseDate(new Date().toISOString().split("T")[0]);
       setShowAddForm(false);
+      setIsEditing(false);
+      setEditingExpenseId(null);
     } catch (error) {
       console.error('Error creating expense:', error);
       alert('Failed to create expense. Please try again.');
@@ -191,6 +223,32 @@ export default function ExpenseTrackingPage() {
     } catch (error) {
       console.error('Error processing receipt:', error);
       alert('Failed to process receipt. Please try again.');
+    }
+  };
+
+  const handleEditClick = (expense: Expense) => {
+    setIsEditing(true);
+    setEditingExpenseId(expense.id);
+    setAmount(String(expense.amount));
+    setSelectedCategory(expense.category);
+    setDescription(expense.description);
+    setExpenseDate(expense.date);
+    setShowAddForm(true);
+  };
+
+  const handleDeleteClick = async (expenseId: string) => {
+    if (!confirm('Delete this expense?')) return;
+    try {
+      const token = api.getToken();
+      if (!token) {
+        alert('Please log in to delete expenses');
+        return;
+      }
+      await api.delete(`expenses/${expenseId}`);
+      setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      alert('Failed to delete expense. Please try again.');
     }
   };
 
@@ -365,7 +423,7 @@ export default function ExpenseTrackingPage() {
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setShowAddForm(false)}
+                onClick={() => { setShowAddForm(false); setIsEditing(false); setEditingExpenseId(null); }}
                 className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
               >
                 Cancel
@@ -374,7 +432,7 @@ export default function ExpenseTrackingPage() {
                 type="submit"
                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
               >
-                Add Expense
+                {isEditing ? 'Save Changes' : 'Add Expense'}
               </button>
             </div>
           </form>
@@ -447,7 +505,9 @@ export default function ExpenseTrackingPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="flex items-center space-x-3">
+                    <button onClick={() => handleEditClick(expense)} className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Edit</button>
+                    <button onClick={() => handleDeleteClick(expense.id)} className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">Delete</button>
                     <p className="font-bold text-gray-900 dark:text-white">${expense.amount.toFixed(2)}</p>
                   </div>
                 </div>
