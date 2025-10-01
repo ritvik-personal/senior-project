@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from "react";
 import api from "@/utils/api";
+// 1. ADDED helper function to get user ID from the auth token
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || null;
+  } catch (error) {
+    console.error("Failed to parse token:", error);
+    return null;
+  }
+}
 
 interface Expense {
   id: string;
@@ -60,6 +70,9 @@ export default function ExpenseTrackingPage() {
   // State to manage the visibility of the new participant dropdown
   const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
 
+  // 2. ADDED state to store the current user's ID
+  const [userId, setUserId] = useState<string | null>(null);
+
   const categories: Category[] = [
     { id: "Food", name: "Food", icon: "🍽️", color: "bg-orange-100 text-orange-800" },
     { id: "Transportation", name: "Transportation", icon: "🚗", color: "bg-blue-100 text-blue-800" },
@@ -72,6 +85,16 @@ export default function ExpenseTrackingPage() {
     { id: "Clothing", name: "Clothing", icon: "👕", color: "bg-indigo-100 text-indigo-800" },
     { id: "Paycheck", name: "Paycheck", icon: "💵", color: "bg-green-100 text-green-800" },
   ];
+
+  // This new useEffect gets the user's ID when the page loads
+  useEffect(() => {
+    const token = api.getToken();
+    if (token) {
+      const id = getUserIdFromToken(token);
+      setUserId(id);
+    }
+    // No 'else' needed, as other functions already handle the non-logged-in case
+  }, []);
 
   useEffect(() => {
     const savedGroups = localStorage.getItem("groups");
@@ -299,6 +322,7 @@ export default function ExpenseTrackingPage() {
     .reduce((sum, expense) => sum + expense.amount, 0);
 
   const currentGroupMembers = groups.find((g) => g.id === selectedGroup)?.members || [];
+  const userGroups = userId ? groups.filter(g => g.members.includes(userId)) : [];
 
   return (
     <div className="space-y-6">
@@ -472,7 +496,8 @@ export default function ExpenseTrackingPage() {
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
                   >
                     <option value="">Select group</option>
-                    {groups.map((group) => (
+                    {/* 3. Use the filtered userGroups list here */}
+                    {userGroups.map((group) => (
                       <option key={group.id} value={group.id}>
                         {group.name}
                       </option>
