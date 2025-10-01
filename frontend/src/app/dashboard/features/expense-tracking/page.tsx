@@ -57,6 +57,9 @@ export default function ExpenseTrackingPage() {
   const [selectedGroup, setSelectedGroup] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
 
+  // State to manage the visibility of the new participant dropdown
+  const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
+
   const categories: Category[] = [
     { id: "Food", name: "Food", icon: "🍽️", color: "bg-orange-100 text-orange-800" },
     { id: "Transportation", name: "Transportation", icon: "🚗", color: "bg-blue-100 text-blue-800" },
@@ -70,7 +73,6 @@ export default function ExpenseTrackingPage() {
     { id: "Paycheck", name: "Paycheck", icon: "💵", color: "bg-green-100 text-green-800" },
   ];
 
-  // Load groups from localStorage
   useEffect(() => {
     const savedGroups = localStorage.getItem("groups");
     if (savedGroups) {
@@ -82,7 +84,6 @@ export default function ExpenseTrackingPage() {
     }
   }, []);
 
-  // Load expenses from backend or localStorage
   useEffect(() => {
     const loadExpenses = async () => {
       try {
@@ -127,7 +128,6 @@ export default function ExpenseTrackingPage() {
     loadExpenses();
   }, []);
 
-  // Save to localStorage whenever expenses change
   useEffect(() => {
     localStorage.setItem("expenses", JSON.stringify(expenses));
   }, [expenses]);
@@ -217,17 +217,13 @@ export default function ExpenseTrackingPage() {
     }
   };
 
-  // --- ADDED THIS FUNCTION BACK ---
   const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      // For now, simulate OCR processing and create an expense
-      // TODO: Implement actual OCR processing or file upload to backend
       setTimeout(async () => {
         try {
-          // Check if user is authenticated
           const token = api.getToken();
           if (!token) {
             alert('Please log in to upload receipts');
@@ -237,9 +233,8 @@ export default function ExpenseTrackingPage() {
           const mockOCRData = {
             amount_dollars: 15.99,
             credit: false,
-            category: "Food", // Use database category
+            category: "Food",
             description: "Coffee and pastry from campus cafe"
-            // metadata removed until database column is added
           };
 
           const response = await api.post('expenses/', mockOCRData);
@@ -303,9 +298,10 @@ export default function ExpenseTrackingPage() {
     })
     .reduce((sum, expense) => sum + expense.amount, 0);
 
+  const currentGroupMembers = groups.find((g) => g.id === selectedGroup)?.members || [];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Expense Tracking</h2>
@@ -329,7 +325,6 @@ export default function ExpenseTrackingPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
           <div className="flex items-center">
@@ -344,7 +339,6 @@ export default function ExpenseTrackingPage() {
             </div>
           </div>
         </div>
-
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
           <div className="flex items-center">
             <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
@@ -358,7 +352,6 @@ export default function ExpenseTrackingPage() {
             </div>
           </div>
         </div>
-
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
           <div className="flex items-center">
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
@@ -374,14 +367,12 @@ export default function ExpenseTrackingPage() {
         </div>
       </div>
 
-      {/* Add Expense Form */}
       {showAddForm && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
             {isEditing ? "Edit Expense" : "Add New Expense"}
           </h3>
           <form onSubmit={handleAddExpense} className="space-y-4">
-            {/* Line 1: Amount, Category, Date */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -428,7 +419,6 @@ export default function ExpenseTrackingPage() {
               </div>
             </div>
 
-            {/* Line 2: Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Description
@@ -443,7 +433,6 @@ export default function ExpenseTrackingPage() {
               />
             </div>
 
-            {/* Line 3: Expense Type & Group Selector */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -493,31 +482,53 @@ export default function ExpenseTrackingPage() {
               )}
             </div>
 
-            {/* Line 4: Participants (only if group selected) */}
             {expenseType === "group" && selectedGroup && (
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Participants
                 </label>
-                <div className="flex flex-wrap gap-3">
-                  {groups
-                    .find((g) => g.id === selectedGroup)
-                    ?.members.map((member) => (
-                      <label key={member} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={participants.includes(member)}
-                          onChange={() => handleParticipantToggle(member)}
-                        />
-                        <span>{member}</span>
-                      </label>
-                    ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsParticipantDropdownOpen(!isParticipantDropdownOpen)}
+                  className="w-full flex justify-between items-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-left"
+                >
+                  <span className="truncate">
+                    {participants.length > 0 ? participants.join(', ') : "Select participants"}
+                  </span>
+                  <svg
+                    className={`w-5 h-5 transition-transform ${isParticipantDropdownOpen ? 'transform rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </button>
+
+                {isParticipantDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
+                    <ul className="max-h-60 overflow-auto">
+                      {currentGroupMembers.map((member) => (
+                        <li
+                          key={member}
+                          onClick={() => handleParticipantToggle(member)}
+                          className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          <span>{member}</span>
+                          {participants.includes(member) && (
+                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Form Buttons */}
-            <div className="flex justify-end space-x-3">
+            <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
                 onClick={() => {
@@ -540,8 +551,6 @@ export default function ExpenseTrackingPage() {
         </div>
       )}
 
-      {/* --- ADDED THIS JSX BLOCK BACK --- */}
-      {/* Receipt Upload */}
       {showUploadForm && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Upload Receipt</h3>
@@ -574,8 +583,6 @@ export default function ExpenseTrackingPage() {
         </div>
       )}
 
-
-      {/* Expense List */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
           Recent Expenses
