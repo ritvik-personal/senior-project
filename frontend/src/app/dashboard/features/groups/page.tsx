@@ -3,13 +3,25 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import api from "@/utils/api";
 
 interface Group {
   id: string;
   name: string;
   description: string;
   code: string;
-  members: string[];
+  members: string[]; // Stores user IDs
+}
+
+// Helper function to parse the JWT and extract the user ID
+function getUserIdFromToken(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || null;
+  } catch (error) {
+    console.error("Failed to parse token:", error);
+    return null;
+  }
 }
 
 export default function GroupsPage() {
@@ -25,79 +37,105 @@ export default function GroupsPage() {
     return [];
   });
 
+  const [userId, setUserId] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
 
-  // Keep localStorage in sync
+  useEffect(() => {
+    const token = api.getToken();
+    if (token) {
+      const id = getUserIdFromToken(token);
+      setUserId(id);
+    } else {
+      router.push("/login");
+    }
+  }, [router]);
+
   useEffect(() => {
     localStorage.setItem("groups", JSON.stringify(groups));
   }, [groups]);
-
-  /* ---------------- CREATE GROUP ---------------- */
+  
   const handleCreateGroup = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupName) return;
-
+    if (!groupName || !userId) return;
     const newGroup: Group = {
       id: crypto.randomUUID(),
       name: groupName,
       description: groupDescription,
       code: crypto.randomUUID().slice(0, 8),
-      members: [],
+      members: [userId],
     };
-
     setGroups([newGroup, ...groups]);
     setGroupName("");
     setGroupDescription("");
     alert(`Group "${newGroup.name}" created with code: ${newGroup.code}`);
   };
 
-  /* ---------------- JOIN GROUP ---------------- */
   const handleJoinGroup = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinCode) return;
-
-    const allGroups: Group[] = JSON.parse(localStorage.getItem("groups") || "[]");
-    const found = allGroups.find((g) => g.code === joinCode.trim());
-
-    if (!found) {
+    if (!joinCode || !userId) return;
+    const groupToJoin = groups.find((g) => g.code === joinCode.trim());
+    if (!groupToJoin) {
       alert("No group found with that code.");
       return;
     }
-
-    if (!found.members.includes("You")) {
-      found.members.push("You");
+    if (groupToJoin.members.includes(userId)) {
+      alert(`You are already in the group "${groupToJoin.name}".`);
+      return;
     }
-
-    const updatedGroups = allGroups.map((g) => (g.id === found.id ? found : g));
-    setGroups(updatedGroups);
+    const updatedGroup = { ...groupToJoin, members: [...groupToJoin.members, userId] };
+    setGroups(groups.map((g) => (g.id === updatedGroup.id ? updatedGroup : g)));
     setJoinCode("");
-    alert(`Joined group "${found.name}"`);
+    alert(`Joined group "${updatedGroup.name}"`);
   };
 
-  /* ---------------- DELETE / LEAVE GROUP ---------------- */
-  const handleDeleteGroup = (id: string) => {
-    if (!confirm("Are you sure you want to delete/leave this group?")) return;
-    setGroups((prev) => prev.filter((g) => g.id !== id));
+  const handleLeaveGroup = (id: string) => {
+    if (!userId || !confirm("Are you sure you want to leave this group?")) return;
+    const groupToLeave = groups.find((g) => g.id === id);
+    if (!groupToLeave) return;
+    const updatedMembers = groupToLeave.members.filter((memberId) => memberId !== userId);
+    if (updatedMembers.length === 0) {
+      setGroups(groups.filter((g) => g.id !== id));
+    } else {
+      const updatedGroup = { ...groupToLeave, members: updatedMembers };
+      setGroups(groups.map((g) => (g.id === id ? updatedGroup : g)));
+    }
     if (expandedGroupId === id) setExpandedGroupId(null);
   };
 
-  /* ---------------- LOGOUT ---------------- */
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("access_token");
-    router.push("/login");
+  // 1. THIS FUNCTION IS NOW CORRECTED
+  // It matches the working implementation from your Dashboard page.
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        await fetch("http://localhost:8000/api/auth/logout", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Logout API call failed:", error);
+    } finally {
+      // Always clear local storage and redirect
+      localStorage.removeItem("user");
+      localStorage.removeItem("access_token");
+      window.location.href = "/login"; // Using hard redirect for consistency
+    }
   };
+
+  const userGroups = userId ? groups.filter(g => g.members.includes(userId)) : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      {/* NAVBAR */}
       <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
-            {/* Logo */}
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">C</span>
@@ -106,8 +144,6 @@ export default function GroupsPage() {
                 CampusFin
               </span>
             </div>
-
-            {/* Back + Logout */}
             <div className="flex items-center space-x-4">
               <Link
                 href="/dashboard"
@@ -126,16 +162,14 @@ export default function GroupsPage() {
         </div>
       </header>
 
-      {/* MAIN CONTENT */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Groups</h2>
           <p className="text-gray-600 dark:text-gray-300">
-            Create, join, and manage groups (local only for now)
+            Create, join, and manage your groups.
           </p>
         </div>
 
-        {/* CREATE GROUP */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
             Create Group
@@ -160,7 +194,6 @@ export default function GroupsPage() {
           </form>
         </div>
 
-        {/* JOIN GROUP */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
             Join Group
@@ -179,16 +212,15 @@ export default function GroupsPage() {
           </form>
         </div>
 
-        {/* MY GROUPS */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
             My Groups
           </h3>
-          {groups.length === 0 ? (
-            <p className="text-gray-600 dark:text-gray-300">You have no groups yet.</p>
+          {userGroups.length === 0 ? (
+            <p className="text-gray-600 dark:text-gray-300">You haven't joined or created any groups yet.</p>
           ) : (
             <div className="space-y-3">
-              {groups.map((g) => (
+              {userGroups.map((g) => (
                 <div
                   key={g.id}
                   className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700 cursor-pointer"
@@ -210,23 +242,21 @@ export default function GroupsPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteGroup(g.id);
+                        handleLeaveGroup(g.id);
                       }}
                       className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
                     >
-                      Delete
+                      Leave
                     </button>
                   </div>
 
                   {expandedGroupId === g.id && (
                     <div className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
                       {g.description && <p>{g.description}</p>}
-                      {g.members.length > 0 && (
-                        <div>
-                          <strong className="font-medium">Members:</strong>{" "}
+                      <div>
+                          <strong className="font-medium">Members ({g.members.length}):</strong>{" "}
                           {g.members.join(", ")}
-                        </div>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>
