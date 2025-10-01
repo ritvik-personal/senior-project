@@ -217,6 +217,54 @@ export default function ExpenseTrackingPage() {
     }
   };
 
+  // --- ADDED THIS FUNCTION BACK ---
+  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // For now, simulate OCR processing and create an expense
+      // TODO: Implement actual OCR processing or file upload to backend
+      setTimeout(async () => {
+        try {
+          // Check if user is authenticated
+          const token = api.getToken();
+          if (!token) {
+            alert('Please log in to upload receipts');
+            return;
+          }
+
+          const mockOCRData = {
+            amount_dollars: 15.99,
+            credit: false,
+            category: "Food", // Use database category
+            description: "Coffee and pastry from campus cafe"
+            // metadata removed until database column is added
+          };
+
+          const response = await api.post('expenses/', mockOCRData);
+          const createdExpense = await response.json();
+          const newExpense: Expense = {
+            id: createdExpense.id,
+            amount: createdExpense.amount_dollars,
+            category: createdExpense.category,
+            description: createdExpense.description || "",
+            date: new Date().toISOString().split("T")[0],
+            type: "personal",
+          };
+          setExpenses([newExpense, ...expenses]);
+          setShowUploadForm(false);
+        } catch (error) {
+          console.error('Error creating expense from receipt:', error);
+          alert('Failed to process receipt. Please try again.');
+        }
+      }, 2000);
+    } catch (error) {
+      console.error('Error processing receipt:', error);
+      alert('Failed to process receipt. Please try again.');
+    }
+  };
+
   const handleEditClick = (expense: Expense) => {
     setIsEditing(true);
     setEditingExpenseId(expense.id);
@@ -491,6 +539,41 @@ export default function ExpenseTrackingPage() {
           </form>
         </div>
       )}
+
+      {/* --- ADDED THIS JSX BLOCK BACK --- */}
+      {/* Receipt Upload */}
+      {showUploadForm && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Upload Receipt</h3>
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleReceiptUpload}
+              className="hidden"
+              id="receipt-upload"
+            />
+            <label htmlFor="receipt-upload" className="cursor-pointer">
+              <span className="text-6xl mb-4 block">📷</span>
+              <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Click to upload receipt
+              </p>
+              <p className="text-gray-600 dark:text-gray-300">
+                OCR will automatically extract expense details
+              </p>
+            </label>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={() => setShowUploadForm(false)}
+              className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* Expense List */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
