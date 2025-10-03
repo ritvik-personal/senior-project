@@ -6,11 +6,14 @@ import Link from "next/link";
 import api from "@/utils/api";
 
 interface Group {
-  id: string;
-  name: string;
-  description: string;
-  code: string;
-  members: string[]; // Stores user IDs
+  group_id: string;
+  group_name: string;
+  group_code: string;
+  group_description?: string;
+  created_by: string;
+  created_at: string;
+  is_admin: boolean;
+  joined_at: string;
 }
 
 // Helper function to parse the JWT and extract the user ID
@@ -26,16 +29,9 @@ function getUserIdFromToken(token: string): string | null {
 
 export default function GroupsPage() {
   const router = useRouter();
-  const [groups, setGroups] = useState<Group[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return JSON.parse(localStorage.getItem("groups") || "[]");
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
@@ -43,66 +39,94 @@ export default function GroupsPage() {
   const [joinCode, setJoinCode] = useState("");
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
 
+  // Load user groups from API
+  const loadUserGroups = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get("groups/my-groups");
+      const data = await response.json();
+      setGroups(data.groups || []);
+    } catch (err) {
+      console.error("Failed to load groups:", err);
+      setError("Failed to load groups");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const token = api.getToken();
     if (token) {
       const id = getUserIdFromToken(token);
       setUserId(id);
+      loadUserGroups();
     } else {
       router.push("/login");
     }
   }, [router]);
-
-  useEffect(() => {
-    localStorage.setItem("groups", JSON.stringify(groups));
-  }, [groups]);
   
-  const handleCreateGroup = (e: React.FormEvent) => {
+  const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupName || !userId) return;
-    const newGroup: Group = {
-      id: crypto.randomUUID(),
-      name: groupName,
-      description: groupDescription,
-      code: crypto.randomUUID().slice(0, 8),
-      members: [userId],
-    };
-    setGroups([newGroup, ...groups]);
-    setGroupName("");
-    setGroupDescription("");
-    alert(`Group "${newGroup.name}" created with code: ${newGroup.code}`);
+    
+    try {
+      const response = await api.post("group-info/", {
+        group_name: groupName,
+        group_description: groupDescription,
+      });
+      const newGroup = await response.json();
+      
+      // Reload groups to get the updated list
+      await loadUserGroups();
+      
+      setGroupName("");
+      setGroupDescription("");
+      alert(`Group "${newGroup.group_name}" created with code: ${newGroup.group_code}`);
+    } catch (err) {
+      console.error("Failed to create group:", err);
+      alert("Failed to create group. Please try again.");
+    }
   };
 
-  const handleJoinGroup = (e: React.FormEvent) => {
+  const handleJoinGroup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinCode || !userId) return;
-    const groupToJoin = groups.find((g) => g.code === joinCode.trim());
-    if (!groupToJoin) {
-      alert("No group found with that code.");
-      return;
+    
+    try {
+      const response = await api.post("groups/join", {
+        group_code: joinCode.trim(),
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        // Reload groups to get the updated list
+        await loadUserGroups();
+        setJoinCode("");
+        alert(result.message);
+      } else {
+        alert(result.message);
+      }
+    } catch (err) {
+      console.error("Failed to join group:", err);
+      alert("Failed to join group. Please try again.");
     }
-    if (groupToJoin.members.includes(userId)) {
-      alert(`You are already in the group "${groupToJoin.name}".`);
-      return;
-    }
-    const updatedGroup = { ...groupToJoin, members: [...groupToJoin.members, userId] };
-    setGroups(groups.map((g) => (g.id === updatedGroup.id ? updatedGroup : g)));
-    setJoinCode("");
-    alert(`Joined group "${updatedGroup.name}"`);
   };
 
-  const handleLeaveGroup = (id: string) => {
+  const handleLeaveGroup = async (group_id: string) => {
     if (!userId || !confirm("Are you sure you want to leave this group?")) return;
-    const groupToLeave = groups.find((g) => g.id === id);
-    if (!groupToLeave) return;
-    const updatedMembers = groupToLeave.members.filter((memberId) => memberId !== userId);
-    if (updatedMembers.length === 0) {
-      setGroups(groups.filter((g) => g.id !== id));
-    } else {
-      const updatedGroup = { ...groupToLeave, members: updatedMembers };
-      setGroups(groups.map((g) => (g.id === id ? updatedGroup : g)));
+    
+    try {
+      await api.delete(`groups/${group_id}/leave`);
+      
+      // Reload groups to get the updated list
+      await loadUserGroups();
+      
+      if (expandedGroupId === group_id) setExpandedGroupId(null);
+      alert("Successfully left the group");
+    } catch (err) {
+      console.error("Failed to leave group:", err);
+      alert("Failed to leave group. Please try again.");
     }
-    if (expandedGroupId === id) setExpandedGroupId(null);
   };
 
   // 1. THIS FUNCTION IS NOW CORRECTED
@@ -129,7 +153,8 @@ export default function GroupsPage() {
     }
   };
 
-  const userGroups = userId ? groups.filter(g => g.members.includes(userId)) : [];
+  // Groups are already filtered by the API to only show user's groups
+  const userGroups = groups;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -187,6 +212,7 @@ export default function GroupsPage() {
               onChange={(e) => setGroupDescription(e.target.value)}
               placeholder="Group description (optional)"
               className="w-full rounded-lg border px-3 py-2 dark:bg-gray-700 dark:text-white"
+              rows={3}
             />
             <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
               Create
@@ -216,33 +242,42 @@ export default function GroupsPage() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
             My Groups
           </h3>
-          {userGroups.length === 0 ? (
+          {loading ? (
+            <p className="text-gray-600 dark:text-gray-300">Loading groups...</p>
+          ) : error ? (
+            <p className="text-red-600 dark:text-red-400">{error}</p>
+          ) : userGroups.length === 0 ? (
             <p className="text-gray-600 dark:text-gray-300">You haven't joined or created any groups yet.</p>
           ) : (
             <div className="space-y-3">
               {userGroups.map((g) => (
                 <div
-                  key={g.id}
+                  key={g.group_id}
                   className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700 cursor-pointer"
                 >
                   <div
                     className="flex justify-between items-center"
                     onClick={() =>
-                      setExpandedGroupId(expandedGroupId === g.id ? null : g.id)
+                      setExpandedGroupId(expandedGroupId === g.group_id ? null : g.group_id)
                     }
                   >
                     <div>
                       <div className="font-medium text-gray-900 dark:text-white">
-                        {g.name}
+                        {g.group_name}
+                        {g.is_admin && (
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            Admin
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
-                        Code: {g.code}
+                        Code: {g.group_code}
                       </div>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleLeaveGroup(g.id);
+                        handleLeaveGroup(g.group_id);
                       }}
                       className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
                     >
@@ -250,12 +285,18 @@ export default function GroupsPage() {
                     </button>
                   </div>
 
-                  {expandedGroupId === g.id && (
+                  {expandedGroupId === g.group_id && (
                     <div className="mt-3 space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                      {g.description && <p>{g.description}</p>}
+                      {g.group_description && (
+                        <div>
+                          <strong className="font-medium">Description:</strong> {g.group_description}
+                        </div>
+                      )}
                       <div>
-                          <strong className="font-medium">Members ({g.members.length}):</strong>{" "}
-                          {g.members.join(", ")}
+                        <strong className="font-medium">Created by:</strong> {g.created_by}
+                      </div>
+                      <div>
+                        <strong className="font-medium">Joined:</strong> {new Date(g.joined_at).toLocaleDateString()}
                       </div>
                     </div>
                   )}
