@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import health, users, auth, expenses
+from app.api import health, users, auth, expenses, group_information, groups
 from app.config import settings
 from app.database import test_connection
 import uvicorn
@@ -28,11 +28,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers: health, users, auth, expenses
+# Include routers: health, users, auth, expenses, group_information, groups
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(users.router, prefix="/api", tags=["users"])
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(expenses.router, prefix="/api/expenses", tags=["expenses"])
+app.include_router(group_information.router, prefix="/api/group-info", tags=["group_information"])
+app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
 
 @app.on_event("startup")
 async def startup_event():
@@ -51,7 +53,9 @@ async def root():
         "health": "/api/health",
         "users": "/api/users",
         "auth": "/api/auth",
-        "expenses": "/api/expenses"
+        "expenses": "/api/expenses",
+        "group_info": "/api/group-info",
+        "groups": "/api/groups"
     }
 
 if __name__ == "__main__":

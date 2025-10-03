@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import api from "@/utils/api";
 
 interface WishlistItem {
   id: string;
@@ -9,6 +10,16 @@ interface WishlistItem {
   notes: string;
   list: string; // "personal" or group id
   purchased: boolean;
+}
+
+interface Group {
+  group_id: string;
+  group_name: string;
+  group_code: string;
+  created_by: string;
+  created_at: string;
+  is_admin: boolean;
+  joined_at: string;
 }
 
 interface Expense {
@@ -33,6 +44,9 @@ export default function SharedWishlistPage() {
     return [];
   });
 
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+
   const [newItem, setNewItem] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedList, setSelectedList] = useState("personal");
@@ -53,10 +67,29 @@ export default function SharedWishlistPage() {
     { id: "other", name: "Other", icon: "📦" },
   ];
 
+  // Load user groups from API
+  const loadUserGroups = async () => {
+    try {
+      setLoadingGroups(true);
+      const response = await api.get("groups/my-groups");
+      const data = await response.json();
+      setGroups(data.groups || []);
+    } catch (err) {
+      console.error("Failed to load groups:", err);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
   // Persist wishlist to localStorage
   useEffect(() => {
     localStorage.setItem("wishlist", JSON.stringify(wishlist));
   }, [wishlist]);
+
+  // Load groups on component mount
+  useEffect(() => {
+    loadUserGroups();
+  }, []);
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,8 +222,14 @@ export default function SharedWishlistPage() {
                 value={selectedList}
                 onChange={(e) => setSelectedList(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={loadingGroups}
               >
                 <option value="personal">Personal</option>
+                {groups.map((group) => (
+                  <option key={group.group_id} value={group.group_id}>
+                    {group.group_name}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
