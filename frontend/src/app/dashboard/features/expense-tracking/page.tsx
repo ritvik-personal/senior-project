@@ -324,79 +324,101 @@ export default function ExpenseTrackingPage() {
   const currentGroupMembers = groups.find((g) => g.id === selectedGroup)?.members || [];
   const userGroups = userId ? groups.filter(g => g.members.includes(userId)) : [];
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Expense Tracking</h2>
-          <p className="text-gray-600 dark:text-gray-300">
-            Track your personal and group expenses
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setShowUploadForm(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            📷 Upload Receipt
-          </button>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-          >
-            ➕ Add Expense
-          </button>
-        </div>
+return (
+  <div className="space-y-6">
+    {/* Header */}
+    <div className="flex justify-between items-center">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Expense Tracking</h2>
+        <p className="text-gray-600 dark:text-gray-300">
+          Track your personal and group expenses
+        </p>
       </div>
+      <div className="flex space-x-3">
+        <button
+          onClick={() => setShowUploadForm(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          📷 Upload Receipt
+        </button>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+        >
+          ➕ Add Expense
+        </button>
+      </div>
+    </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">💸</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600 dark:text-gray-300">Total Expenses</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${totalExpenses.toFixed(2)}
-              </p>
-            </div>
+    {/* Stats */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+        <div className="flex items-center">
+          <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+            <span className="text-2xl">💸</span>
           </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">📅</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600 dark:text-gray-300">This Month</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ${monthlyExpenses.toFixed(2)}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-              <span className="text-2xl">📊</span>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm text-gray-600 dark:text-gray-300">Transactions</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {expenses.length}
-              </p>
-            </div>
+          <div className="ml-4">
+            <p className="text-sm text-gray-600 dark:text-gray-300">Total Expenses</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              ${totalExpenses.toFixed(2)}
+            </p>
           </div>
         </div>
       </div>
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+        <div className="flex items-center">
+          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+            <span className="text-2xl">📅</span>
+          </div>
+          <div className="ml-4">
+            <p className="text-sm text-gray-600 dark:text-gray-300">This Month</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              ${monthlyExpenses.toFixed(2)}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+        <div className="flex items-center">
+          <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+            <span className="text-2xl">📊</span>
+          </div>
+          <div className="ml-4">
+            <p className="text-sm text-gray-600 dark:text-gray-300">Transactions</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              {expenses.length}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
 
-      {showAddForm && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+    {/* ADD / EDIT EXPENSE POPUP */}
+    {showAddForm && (
+      <div
+        className={`fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50 transition-opacity ${
+          showAddForm ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-4 relative">
+          <button
+            onClick={() => {
+              setShowAddForm(false);
+              setIsEditing(false);
+              setEditingExpenseId(null);
+            }}
+            className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+          >
+            ✖
+          </button>
+
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
             {isEditing ? "Edit Expense" : "Add New Expense"}
           </h3>
+
+          {/* FORM */}
           <form onSubmit={handleAddExpense} className="space-y-4">
+            {/* First Line: Amount, Category, Date */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -418,7 +440,7 @@ export default function ExpenseTrackingPage() {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
                   required
                 >
                   <option value="">Select category</option>
@@ -443,6 +465,7 @@ export default function ExpenseTrackingPage() {
               </div>
             </div>
 
+            {/* Line 2: Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Description
@@ -457,18 +480,21 @@ export default function ExpenseTrackingPage() {
               />
             </div>
 
+            {/* Line 3: Expense Type + Group */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Expense Type
                 </label>
-                <div className="flex items-center h-full space-x-6">
+                <div className="flex items-center space-x-6">
                   <label className="flex items-center">
                     <input
                       type="radio"
                       value="personal"
                       checked={expenseType === "personal"}
-                      onChange={(e) => setExpenseType(e.target.value as "personal" | "group")}
+                      onChange={(e) =>
+                        setExpenseType(e.target.value as "personal" | "group")
+                      }
                       className="mr-2"
                     />
                     Personal
@@ -478,7 +504,9 @@ export default function ExpenseTrackingPage() {
                       type="radio"
                       value="group"
                       checked={expenseType === "group"}
-                      onChange={(e) => setExpenseType(e.target.value as "personal" | "group")}
+                      onChange={(e) =>
+                        setExpenseType(e.target.value as "personal" | "group")
+                      }
                       className="mr-2"
                     />
                     Group
@@ -496,7 +524,6 @@ export default function ExpenseTrackingPage() {
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
                   >
                     <option value="">Select group</option>
-                    {/* 3. Use the filtered userGroups list here */}
                     {userGroups.map((group) => (
                       <option key={group.id} value={group.id}>
                         {group.name}
@@ -507,6 +534,7 @@ export default function ExpenseTrackingPage() {
               )}
             </div>
 
+            {/* Participants */}
             {expenseType === "group" && selectedGroup && (
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -518,18 +546,26 @@ export default function ExpenseTrackingPage() {
                   className="w-full flex justify-between items-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-left"
                 >
                   <span className="truncate">
-                    {participants.length > 0 ? participants.join(', ') : "Select participants"}
+                    {participants.length > 0
+                      ? participants.join(", ")
+                      : "Select participants"}
                   </span>
                   <svg
-                    className={`w-5 h-5 transition-transform ${isParticipantDropdownOpen ? 'transform rotate-180' : ''}`}
+                    className={`w-5 h-5 transition-transform ${
+                      isParticipantDropdownOpen ? "rotate-180" : ""
+                    }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    ></path>
                   </svg>
                 </button>
-
                 {isParticipantDropdownOpen && (
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg">
                     <ul className="max-h-60 overflow-auto">
@@ -541,8 +577,18 @@ export default function ExpenseTrackingPage() {
                         >
                           <span>{member}</span>
                           {participants.includes(member) && (
-                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                            <svg
+                              className="w-5 h-5 text-blue-600"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="3"
+                                d="M5 13l4 4L19 7"
+                              ></path>
                             </svg>
                           )}
                         </li>
@@ -553,6 +599,7 @@ export default function ExpenseTrackingPage() {
               </div>
             )}
 
+            {/* Buttons */}
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
@@ -574,11 +621,27 @@ export default function ExpenseTrackingPage() {
             </div>
           </form>
         </div>
-      )}
+      </div>
+    )}
 
-      {showUploadForm && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Upload Receipt</h3>
+    {/* UPLOAD RECEIPT POPUP */}
+    {showUploadForm && (
+      <div
+        className={`fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50 transition-opacity ${
+          showUploadForm ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 relative">
+          <button
+            onClick={() => setShowUploadForm(false)}
+            className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+          >
+            ✖
+          </button>
+
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Upload Receipt
+          </h3>
           <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
             <input
               type="file"
@@ -597,84 +660,80 @@ export default function ExpenseTrackingPage() {
               </p>
             </label>
           </div>
-          <div className="mt-4 flex justify-end">
-            <button
-              onClick={() => setShowUploadForm(false)}
-              className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
-      )}
+      </div>
+    )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-          Recent Expenses
-        </h3>
-        {expenses.length === 0 ? (
-          <div className="text-center py-8">
-            <span className="text-6xl mb-4 block">📱</span>
-            <p className="text-gray-600 dark:text-gray-300">No expenses recorded yet</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Add your first expense to get started
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {expenses.map((expense) => {
-              const category = categories.find((cat) => cat.id === expense.category);
-              return (
-                <div
-                  key={expense.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${category?.color}`}
-                    >
-                      <span className="text-lg">{category?.icon}</span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {expense.description}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        {category?.name} • {expense.date} • {expense.type}
-                      </p>
-                      {expense.type === "group" && expense.groupId && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Group: {groups.find((g) => g.id === expense.groupId)?.name || "Unknown"}
-                          {expense.participants?.length
-                            ? ` • Participants: ${expense.participants.join(", ")}`
-                            : ""}
-                        </p>
-                      )}
-                    </div>
+    {/* EXPENSE LIST */}
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+        Recent Expenses
+      </h3>
+      {expenses.length === 0 ? (
+        <div className="text-center py-8">
+          <span className="text-6xl mb-4 block">📱</span>
+          <p className="text-gray-600 dark:text-gray-300">No expenses recorded yet</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Add your first expense to get started
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {expenses.map((expense) => {
+            const category = categories.find((cat) => cat.id === expense.category);
+            return (
+              <div
+                key={expense.id}
+                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+              >
+                <div className="flex items-center space-x-4">
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${category?.color}`}
+                  >
+                    <span className="text-lg">{category?.icon}</span>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => handleEditClick(expense)}
-                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(expense.id)}
-                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      Delete
-                    </button>
-                    <p className="font-bold text-gray-900 dark:text-white">
-                      ${expense.amount.toFixed(2)}
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {expense.description}
                     </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {category?.name} • {expense.date} • {expense.type}
+                    </p>
+                    {expense.type === "group" && expense.groupId && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Group: {groups.find((g) => g.id === expense.groupId)?.name || "Unknown"}
+                        {expense.participants?.length
+                          ? ` • Participants: ${expense.participants.join(", ")}`
+                          : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => handleEditClick(expense)}
+                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(expense.id)}
+                    className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                  >
+                    Delete
+                  </button>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    ${expense.amount.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
+
+
 }
