@@ -41,15 +41,15 @@ export default function Dashboard() {
     // Check if user is logged in and verify token
     const userData = localStorage.getItem("user");
     const token = localStorage.getItem("access_token");
-    
+
     if (userData && token) {
       setUser(JSON.parse(userData));
-      
+
       // Optional: Verify token with backend
       // This could be implemented later for additional security
       // verifyTokenWithBackend(token);
     }
-    
+
     setIsLoading(false);
   }, []);
 
@@ -174,26 +174,48 @@ export default function Dashboard() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                 Quick Actions
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button 
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
+                <button
                   onClick={() => setActiveTab('expense-tracking')}
                   className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                 >
                   <div className="text-center">
                     <span className="text-3xl mb-2 block">📱</span>
-                    <p className="font-medium">Add Expense</p>
+                    <p className="font-medium">Expense Tracking</p>
                   </div>
                 </button>
-                <button 
+
+                <button
                   onClick={() => setActiveTab('budgeting-templates')}
                   className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
                 >
                   <div className="text-center">
                     <span className="text-3xl mb-2 block">📊</span>
-                    <p className="font-medium">Create Budget</p>
+                    <p className="font-medium">Budget Templates</p>
                   </div>
                 </button>
-                <button 
+
+                <button
+                  onClick={() => setActiveTab('shared-wishlist')}
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors"
+                >
+                  <div className="text-center">
+                    <span className="text-3xl mb-2 block">🛒</span>
+                    <p className="font-medium">Shared Wishlist</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('credit-card-tool')}
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
+                >
+                  <div className="text-center">
+                    <span className="text-3xl mb-2 block">💳</span>
+                    <p className="font-medium">Credit Cards</p>
+                  </div>
+                </button>
+
+                <button
                   onClick={() => setActiveTab('investment-insights')}
                   className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
                 >
@@ -202,26 +224,35 @@ export default function Dashboard() {
                     <p className="font-medium">Investment Insights</p>
                   </div>
                 </button>
+
+                <Link
+                  href="/dashboard/features/groups"
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors text-center"
+                >
+                  <span className="text-3xl mb-2 block">👥</span>
+                  <p className="font-medium">Manage Groups</p>
+                </Link>
               </div>
             </div>
+
           </div>
         );
-      
+
       case 'expense-tracking':
         return <ExpenseTrackingPage />;
-      
+
       case 'budgeting-templates':
         return <BudgetingTemplatesPage />;
-      
+
       case 'shared-wishlist':
         return <SharedWishlistPage />;
-      
+
       case 'credit-card-tool':
         return <CreditCardToolPage />;
-      
+
       case 'investment-insights':
         return <InvestmentInsightsPage />;
-      
+
       default:
         return null;
     }
@@ -265,61 +296,55 @@ export default function Dashboard() {
             <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'overview'
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'overview'
                     ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 📊 Overview
               </button>
               <button
                 onClick={() => setActiveTab('expense-tracking')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'expense-tracking'
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'expense-tracking'
                     ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 📱 Expenses
               </button>
               <button
                 onClick={() => setActiveTab('budgeting-templates')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'budgeting-templates'
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'budgeting-templates'
                     ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 📊 Budget
               </button>
               <button
                 onClick={() => setActiveTab('shared-wishlist')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'shared-wishlist'
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'shared-wishlist'
                     ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 🛒 Wishlist
               </button>
               <button
                 onClick={() => setActiveTab('credit-card-tool')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'credit-card-tool'
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'credit-card-tool'
                     ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 💳 Cards
               </button>
               <button
                 onClick={() => setActiveTab('investment-insights')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'investment-insights'
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'investment-insights'
                     ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 📈 Invest
               </button>
