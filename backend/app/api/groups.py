@@ -106,25 +106,71 @@ async def get_my_groups_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.delete("/leave")
+async def leave_group_by_code_endpoint(
+    payload: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token)
+):
+    """Leave a group by providing the group code in the JSON body.
+
+    Expects: { "group_code": "ABCD1234" }
+    Flow:
+      - Lookup `group_id` from `group_information` where group_code matches
+      - Delete from `groups` where group_id and user_id match
+    """
+    try:
+        group_code = (payload or {}).get("group_code")
+        if not group_code:
+            raise HTTPException(status_code=400, detail="group_code is required")
+
+        group_info = get_group_by_code(group_code, access_token)
+        if not group_info:
+            raise HTTPException(status_code=404, detail="Group not found")
+
+        group_id = group_info["group_id"]
+
+        # Ensure the user is a member
+        if not check_user_in_group(current_user_id, group_id, access_token):
+            raise HTTPException(status_code=404, detail="You are not a member of this group")
+
+        success = remove_group_membership(group_id, current_user_id, access_token)
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to leave group")
+
+        return {"message": "Successfully left the group"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/{group_id}/members", response_model=List[GroupMemberResponse])
 async def get_group_members_endpoint(
     group_id: str = Path(..., description="Group ID"),
+    exclude_self: bool = Query(False, description="Exclude current user from results"),
+    current_user_id: str = Depends(get_current_user_id),
     access_token: str = Depends(get_access_token)
 ):
-    """Get all members of a specific group"""
+    """Get all members of a specific group, optionally excluding the current user."""
     try:
-        members_data = get_group_members(group_id, access_token)
-        
-        members = []
-        for member in members_data:
+        raw_members = get_group_members(group_id, access_token)
+
+        # First operation: build filtered list of member user_ids (optionally excluding current user)
+        filtered_members = [m for m in raw_members if not (exclude_self and m.get("user_id") == current_user_id)]
+
+        members: List[GroupMemberResponse] = []
+        for member in filtered_members:
+            uid = member["user_id"]
             members.append(GroupMemberResponse(
-                user_id=member["user_id"],
+                user_id=uid,
                 is_admin=member.get("is_admin", False),
-                joined_at=member.get("joined_at", "")
+                joined_at=member.get("joined_at", ""),
+                email=None,
             ))
-        
+
         return members
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

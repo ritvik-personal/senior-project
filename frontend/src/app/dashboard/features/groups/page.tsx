@@ -112,15 +112,14 @@ export default function GroupsPage() {
     }
   };
 
-  const handleLeaveGroup = async (group_id: string) => {
+  const handleLeaveGroup = async (group_code: string, group_id: string) => {
     if (!userId || !confirm("Are you sure you want to leave this group?")) return;
-    
     try {
-      await api.delete(`groups/${group_id}/leave`);
-      
+      await api.delete(`groups/leave`, {
+        body: JSON.stringify({ group_code }),
+      });
       // Reload groups to get the updated list
       await loadUserGroups();
-      
       if (expandedGroupId === group_id) setExpandedGroupId(null);
       alert("Successfully left the group");
     } catch (err) {
@@ -277,7 +276,7 @@ export default function GroupsPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleLeaveGroup(g.group_id);
+                        handleLeaveGroup(g.group_code, g.group_id);
                       }}
                       className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
                     >

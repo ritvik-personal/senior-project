@@ -38,6 +38,11 @@ interface Group {
   members: string[];
 }
 
+interface MemberInfo {
+  user_id: string;
+  email?: string;
+}
+
 export default function ExpenseTrackingPage() {
   const [expenses, setExpenses] = useState<Expense[]>(() => {
     if (typeof window !== "undefined") {
@@ -66,6 +71,7 @@ export default function ExpenseTrackingPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
+  const [memberInfos, setMemberInfos] = useState<MemberInfo[]>([]);
 
   // State to manage the visibility of the new participant dropdown
   const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
@@ -96,16 +102,53 @@ export default function ExpenseTrackingPage() {
     // No 'else' needed, as other functions already handle the non-logged-in case
   }, []);
 
+  // Load user's groups from backend when expense type switches to group
   useEffect(() => {
-    const savedGroups = localStorage.getItem("groups");
-    if (savedGroups) {
+    const loadUserGroups = async () => {
       try {
-        setGroups(JSON.parse(savedGroups));
-      } catch {
+        const token = api.getToken();
+        if (!token) return;
+        const resp = await api.get("groups/my-groups");
+        const data = await resp.json();
+        // Map backend schema to local Group interface
+        const mapped: Group[] = (data.groups || []).map((g: any) => ({
+          id: g.group_id,
+          name: g.group_name,
+          description: g.group_description || "",
+          members: [], // fetched separately when a group is selected
+        }));
+        setGroups(mapped);
+      } catch (e) {
+        console.error("Failed to load user groups:", e);
         setGroups([]);
       }
+    };
+
+    if (expenseType === "group") {
+      loadUserGroups();
     }
-  }, []);
+  }, [expenseType]);
+
+  // Load members for the selected group to populate participants dropdown
+  useEffect(() => {
+    const loadGroupMembers = async () => {
+      try {
+        if (!selectedGroup) return;
+        const resp = await api.get(`groups/${selectedGroup}/members?exclude_self=true`);
+        const data = await resp.json();
+        // data is [{ user_id, is_admin, joined_at, email? }]
+        const memberIds = (data || []).map((m: any) => m.user_id);
+        setGroups(prev => prev.map(g => g.id === selectedGroup ? { ...g, members: memberIds } : g));
+        setMemberInfos((data || []).map((m: any) => ({ user_id: m.user_id, email: m.email })));
+      } catch (e) {
+        console.error("Failed to load group members:", e);
+      }
+    };
+
+    if (expenseType === "group" && selectedGroup) {
+      loadGroupMembers();
+    }
+  }, [expenseType, selectedGroup]);
 
   useEffect(() => {
     const loadExpenses = async () => {
@@ -322,7 +365,8 @@ export default function ExpenseTrackingPage() {
     .reduce((sum, expense) => sum + expense.amount, 0);
 
   const currentGroupMembers = groups.find((g) => g.id === selectedGroup)?.members || [];
-  const userGroups = userId ? groups.filter(g => g.members.includes(userId)) : [];
+  // All groups returned from API are the user's groups
+  const userGroups = groups;
 
 return (
   <div className="space-y-6">
@@ -575,7 +619,7 @@ return (
                           onClick={() => handleParticipantToggle(member)}
                           className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                         >
-                          <span>{member}</span>
+                          <span>{memberInfos.find(mi => mi.user_id === member)?.email || member}</span>
                           {participants.includes(member) && (
                             <svg
                               className="w-5 h-5 text-blue-600"

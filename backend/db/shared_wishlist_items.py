@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 import logging
 
-from app.database import get_supabase_client
+from app.database import get_supabase_client, get_authenticated_client
 
 logger = logging.getLogger(__name__)
 
@@ -11,15 +11,23 @@ TABLE_NAME = "shared_wishlist_items"
 def _table():
     return get_supabase_client().table(TABLE_NAME)
 
-def create_shared_wishlist_item(item_id: str, group_id: str, desirer_id: str, purchaser_id: str, item:str) -> Dict[str, Any]:
+def _authed_table(access_token: str):
+    return get_authenticated_client(access_token).table(TABLE_NAME)
+
+def create_shared_wishlist_item(item_id: str, group_id: Optional[str], desirer_id: str, purchaser_id: str, item: str, notes: Optional[str] = None, purchased: Optional[bool] = None, access_token: Optional[str] = None) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "item_id": item_id,
         "group_id": group_id,
-        "desirer_id": desirer_id,
-        "purchaser_id": purchaser_id,
+        "desirer": desirer_id,
+        "purchaser": purchaser_id,
         "item": item,
     }
-    resp = _table().insert(payload).select("*").execute()
+    if notes is not None:
+        payload["notes"] = notes
+    if purchased is not None:
+        payload["purchased"] = purchased
+    table = _authed_table(access_token) if access_token else _table()
+    resp = table.insert(payload).execute()
     if resp.data:
         return resp.data[0]
     raise RuntimeError(f"Failed to insert shared wishlist item: {resp}")
@@ -34,23 +42,24 @@ def get_shared_wishlist_items_by_group_id(group_id: str) -> List[Dict[str, Any]]
     resp = query.execute()
     return resp.data
 
-def get_shared_wishlist_items_by_desirer_id(desirer_id: str) -> List[Dict[str, Any]]:
-    query = _table().select("*").eq("desirer_id", desirer_id)
+def get_shared_wishlist_items_by_desirer_id(desirer_id: str, access_token: Optional[str] = None) -> List[Dict[str, Any]]:
+    table = _authed_table(access_token) if access_token else _table()
+    query = table.select("*").eq("desirer", desirer_id)
     resp = query.execute()
     return resp.data
 
 def get_shared_wishlist_items_by_purchaser_id(purchaser_id: str) -> List[Dict[str, Any]]:
-    query = _table().select("*").eq("purchaser_id", purchaser_id)
+    query = _table().select("*").eq("purchaser", purchaser_id)
     resp = query.execute()
     return resp.data
 
 def get_shared_wishlist_items_by_group_id_and_desirer_id(group_id: str, desirer_id: str) -> List[Dict[str, Any]]:
-    query = _table().select("*").eq("group_id", group_id).eq("desirer_id", desirer_id)
+    query = _table().select("*").eq("group_id", group_id).eq("desirer", desirer_id)
     resp = query.execute()
     return resp.data
 
 def get_shared_wishlist_items_by_group_id_and_purchaser_id(group_id: str, purchaser_id: str) -> List[Dict[str, Any]]:
-    query = _table().select("*").eq("group_id", group_id).eq("purchaser_id", purchaser_id)
+    query = _table().select("*").eq("group_id", group_id).eq("purchaser", purchaser_id)
     resp = query.execute()
     return resp.data
 
