@@ -8,7 +8,6 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: str
     password: str
-    name: str
 
 class AuthResponse(BaseModel):
     success: bool

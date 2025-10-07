@@ -36,6 +36,7 @@ class GroupMemberResponse(BaseModel):
     user_id: str
     is_admin: bool
     joined_at: str
+    email: Optional[str] = None
 
 
 class GroupMembershipListResponse(BaseModel):

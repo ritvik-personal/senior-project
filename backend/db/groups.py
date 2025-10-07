@@ -83,7 +83,8 @@ def get_user_groups(user_id: str, access_token: Optional[str] = None) -> List[Di
 def get_group_members(group_id: str, access_token: Optional[str] = None) -> List[Dict[str, Any]]:
     """Get all members of a specific group"""
     table = _authenticated_table(access_token) if access_token else _table()
-    query = table.select("*, users(*)").eq("group_id", group_id)
+    # Select only from the groups membership table; no join since FK doesn't exist
+    query = table.select("*").eq("group_id", group_id)
     resp = query.execute()
     if resp.data:
         return resp.data

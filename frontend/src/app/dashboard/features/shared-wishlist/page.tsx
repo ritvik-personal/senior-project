@@ -143,21 +143,41 @@ export default function SharedWishlistPage() {
     });
   }, [groups]);
 
-  const handleAddItem = (e: React.FormEvent) => {
+  const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItem) return;
-    const item: WishlistItem = {
-      id: crypto.randomUUID(),
-      name: newItem,
-      notes,
-      list: selectedList,
-      purchased: false,
-    };
-    setWishlist([item, ...wishlist]);
-    setNewItem("");
-    setNotes("");
-    setSelectedList("personal");
-    setShowAddModal(false);
+
+    try {
+      if (selectedList === "personal") {
+        // Call backend to create a personal wishlist item
+        const payload = {
+          item_id: crypto.randomUUID(),
+          item: newItem,
+          notes: notes || undefined,
+        };
+        const resp = await api.post("shared-wishlist/personal", payload);
+        const created = await resp.json();
+        const added: WishlistItem = {
+          id: created.shared_wishlist_item_id || created.item_id,
+          name: created.item,
+          notes: created.notes || "",
+          list: "personal",
+          purchased: !!created.purchased,
+        };
+        setWishlist([added, ...wishlist]);
+      } else {
+        alert("Adding to group wishlist is not implemented yet.");
+      }
+    } catch (err) {
+      console.error("Failed to add wishlist item:", err);
+      alert("Failed to add item. Please try again.");
+      return;
+    } finally {
+      setNewItem("");
+      setNotes("");
+      setSelectedList("personal");
+      setShowAddModal(false);
+    }
   };
 
   const toggleSelect = (id: string) => {

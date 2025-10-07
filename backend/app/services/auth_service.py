@@ -42,7 +42,7 @@ class AuthService:
 			response = self.supabase.auth.sign_up({
 				"email": register_data.email,
 				"password": register_data.password,
-				"options": {"data": {"name": register_data.name}},
+				# no name metadata
 			})
 
 			if response.user:

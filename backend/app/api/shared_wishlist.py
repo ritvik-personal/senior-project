@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, HTTPException, Query, Path, Depends
 from typing import List
 
 from db.shared_wishlist_items import (
@@ -18,12 +18,13 @@ from app.schemas.shared_wishlist import (
     SharedWishlistItemResponse,
     SharedWishlistItemListResponse
 )
+from app.utils.auth import get_current_user_id, get_access_token
 
 router = APIRouter()
 
 @router.post("/", response_model=SharedWishlistItemResponse)
 async def create_shared_wishlist_item_endpoint(item: SharedWishlistItemCreate):
-    """Create a new shared wishlist item"""
+    """Create a new shared wishlist item (legacy explicit fields)"""
     try:
         result = create_shared_wishlist_item(
             item_id=item.item_id,
@@ -33,6 +34,42 @@ async def create_shared_wishlist_item_endpoint(item: SharedWishlistItemCreate):
             item=item.item
         )
         return SharedWishlistItemResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/personal", response_model=SharedWishlistItemResponse)
+async def create_personal_wishlist_item_endpoint(
+    payload: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token),
+):
+    """Create a personal wishlist item using bearer token for user id.
+
+    Expects JSON with: { item_id, item, notes? }
+    - group_id is set to NULL
+    - desirer_id and purchaser_id set to current user id
+    - purchased set to false
+    """
+    try:
+        item_id = (payload or {}).get("item_id")
+        item_name = (payload or {}).get("item")
+        notes = (payload or {}).get("notes")
+        if not item_id or not item_name:
+            raise HTTPException(status_code=400, detail="item_id and item are required")
+
+        result = create_shared_wishlist_item(
+            item_id=item_id,
+            group_id=None,
+            desirer_id=current_user_id,
+            purchaser_id=current_user_id,
+            item=item_name,
+            notes=notes,
+            purchased=False,
+            access_token=access_token,
+        )
+        return SharedWishlistItemResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -58,13 +95,28 @@ async def get_shared_wishlist_items_by_group_endpoint(
 
 @router.get("/desirer/{desirer_id}", response_model=SharedWishlistItemListResponse)
 async def get_shared_wishlist_items_by_desirer_endpoint(
-    desirer_id: str = Path(..., description="Desirer ID")
+    desirer_id: str = Path(..., description="Desirer ID"),
+    access_token: str = Depends(get_access_token),
 ):
     """Get all shared wishlist items desired by a user"""
-    items = get_shared_wishlist_items_by_desirer_id(desirer_id)
+    items = get_shared_wishlist_items_by_desirer_id(desirer_id, access_token)
     item_responses = [SharedWishlistItemResponse(**item) for item in items]
     
     return SharedWishlistItemListResponse(items=item_responses)
+
+@router.get("/personal", response_model=SharedWishlistItemListResponse)
+async def get_my_personal_wishlist_items_endpoint(
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token),
+):
+    """Get all personal wishlist items for the current user (desirer == user, group_id is null)"""
+    try:
+        items = get_shared_wishlist_items_by_desirer_id(current_user_id, access_token)
+        # Filter to personal only (group_id is null)
+        items = [i for i in (items or []) if i.get("group_id") is None]
+        return SharedWishlistItemListResponse(items=[SharedWishlistItemResponse(**i) for i in items])
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/purchaser/{purchaser_id}", response_model=SharedWishlistItemListResponse)
 async def get_shared_wishlist_items_by_purchaser_endpoint(

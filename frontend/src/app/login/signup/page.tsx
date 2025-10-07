@@ -23,7 +23,7 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [name, setName] = useState("");
+  // removed Full Name; original minimal signup: email + password
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -54,7 +54,7 @@ export default function SignUpPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (response.ok) {
@@ -96,16 +96,7 @@ export default function SignUpPage() {
         )}
 
         <form onSubmit={handleSignUp} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Full Name</label>
-            <input 
-              type="text" 
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-            />
-          </div>
+          {/* Full Name removed */}
           <div>
             <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Email</label>
             <input 
