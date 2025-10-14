@@ -37,7 +37,10 @@ async def create_expense_endpoint(
             description=expense.description,
             metadata=expense.metadata,
             access_token=access_token,
-            created_at=expense.created_at
+            created_at=expense.created_at,
+            is_group_expense=expense.is_group_expense,
+            group_id=expense.group_id,
+            participant_user_ids=expense.participant_user_ids
         )
         return ExpenseResponse(**result)
     except Exception as e:

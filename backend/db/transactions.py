@@ -21,7 +21,7 @@ def create_transaction(group_id: str, user_owed: str, user_owing: str, amount: f
     }
 
     logger.debug("Inserting transaction payload=%s", payload)
-    resp = _table().insert(payload).select("*").execute()
+    resp = _table().insert(payload).execute()
     if resp.data:
         return resp.data[0]
     raise RuntimeError(f"Failed to insert transaction: {resp}")

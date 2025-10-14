@@ -39,6 +39,9 @@ def create_expense(
     metadata: Optional[Dict[str, Any]] = None,
     access_token: Optional[str] = None,
     created_at: Optional[date] = None,
+    is_group_expense: bool = False,
+    group_id: Optional[str] = None,
+    participant_user_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "user_id": user_id,
@@ -66,6 +69,31 @@ def create_expense(
     if resp.data:
         expense_data = resp.data[0]
         logger.debug("Database returned: %s", expense_data)
+        
+        # If this is a group expense, create transactions for expense splitting
+        if is_group_expense and group_id and participant_user_ids:
+            try:
+                from db.transactions import create_transaction
+                
+                # Calculate the amount each participant owes
+                total_participants = len(participant_user_ids) + 1  # +1 for the expense creator
+                amount_per_person = amount_dollars / total_participants
+                
+                # Create a transaction for each participant
+                for participant_id in participant_user_ids:
+                    create_transaction(
+                        group_id=group_id,
+                        user_owed=user_id,  # The expense creator is owed money
+                        user_owing=participant_id,  # Each participant owes money
+                        amount=amount_per_person
+                    )
+                    logger.debug(f"Created transaction: {participant_id} owes {user_id} ${amount_per_person}")
+                    
+            except Exception as e:
+                logger.error(f"Failed to create transactions for group expense: {e}")
+                # Don't fail the expense creation if transaction creation fails
+                # The expense should still be created even if splitting fails
+        
         return _map_expense_fields(expense_data)
     raise RuntimeError(f"Failed to insert expense: {resp}")
 
