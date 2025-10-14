@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import date
 
 class ExpenseBase(BaseModel):
@@ -12,6 +12,11 @@ class ExpenseBase(BaseModel):
 class ExpenseCreate(ExpenseBase):
     # Optional: allow client to set created_at (e.g., from a date picker)
     created_at: Optional[date] = None  # user_id will be extracted from JWT token
+    
+    # Group expense fields
+    is_group_expense: Optional[bool] = False
+    group_id: Optional[str] = None
+    participant_user_ids: Optional[List[str]] = []
 
 class ExpenseUpdate(BaseModel):
     amount_dollars: Optional[float] = None

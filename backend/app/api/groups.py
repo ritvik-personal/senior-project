@@ -8,6 +8,7 @@ from db.groups import (
     create_group_membership,
     get_user_groups,
     get_group_members,
+    get_group_members_with_emails,
     get_membership_by_user_and_group,
     remove_group_membership,
     check_user_in_group,
@@ -154,7 +155,8 @@ async def get_group_members_endpoint(
 ):
     """Get all members of a specific group, optionally excluding the current user."""
     try:
-        raw_members = get_group_members(group_id, access_token)
+        # Get group members with email information
+        raw_members = get_group_members_with_emails(group_id, access_token)
 
         # First operation: build filtered list of member user_ids (optionally excluding current user)
         filtered_members = [m for m in raw_members if not (exclude_self and m.get("user_id") == current_user_id)]
@@ -166,7 +168,7 @@ async def get_group_members_endpoint(
                 user_id=uid,
                 is_admin=member.get("is_admin", False),
                 joined_at=member.get("joined_at", ""),
-                email=None,
+                email=member.get("email"),  # Now includes actual email
             ))
 
         return members

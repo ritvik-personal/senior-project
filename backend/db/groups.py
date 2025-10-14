@@ -91,6 +91,64 @@ def get_group_members(group_id: str, access_token: Optional[str] = None) -> List
     return []
 
 
+def get_group_members_with_emails(group_id: str, access_token: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Get all members of a specific group with their email addresses"""
+    if not access_token:
+        # Fallback to basic group members if no access token
+        return get_group_members(group_id, access_token)
+    
+    try:
+        # Use authenticated client to access auth.users table
+        supabase_client = get_authenticated_client(access_token)
+        
+        # Query to get group members with their emails from auth.users
+        # This will work after applying the RLS policy updates
+        response = supabase_client.rpc('get_group_members_with_emails', {
+            'target_group_id': group_id
+        }).execute()
+        
+        if response.data:
+            # The RPC function now returns simplified data with just user_id and email
+            # We need to add the missing fields that the API expects
+            result = []
+            for member in response.data:
+                member_data = {
+                    "user_id": member["user_id"],
+                    "email": member["email"],
+                    "is_admin": False,  # Default value
+                    "joined_at": datetime.utcnow().isoformat(),  # Default value
+                }
+                result.append(member_data)
+            return result
+            
+        # Fallback: try direct query if RPC doesn't exist
+        # Get group member user_ids first
+        group_members = get_group_members(group_id, access_token)
+        if not group_members:
+            return []
+        
+        # Get emails for each user_id
+        user_ids = [member["user_id"] for member in group_members]
+        auth_users_response = supabase_client.table("auth.users").select("id, email").in_("id", user_ids).execute()
+        
+        # Create a mapping of user_id to email
+        email_map = {user["id"]: user["email"] for user in auth_users_response.data or []}
+        
+        # Combine group membership data with email information
+        result = []
+        for member in group_members:
+            member_data = member.copy()
+            member_data["email"] = email_map.get(member["user_id"])
+            result.append(member_data)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting group members with emails: {e}")
+        # Fallback to basic group members without emails
+        return get_group_members(group_id, access_token)
+
+
 def get_membership_by_user_and_group(
     user_id: str, 
     group_id: str,

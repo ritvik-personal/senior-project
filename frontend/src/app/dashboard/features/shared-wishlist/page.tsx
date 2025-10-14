@@ -36,16 +36,7 @@ interface Expense {
 }
 
 export default function SharedWishlistPage() {
-  const [wishlist, setWishlist] = useState<WishlistItem[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return JSON.parse(localStorage.getItem("wishlist") || "[]");
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
@@ -80,12 +71,16 @@ export default function SharedWishlistPage() {
   const [openCards, setOpenCards] = useState<Record<string, boolean>>({ personal: true });
 
   const categories = [
-    { id: "food", name: "Food & Dining", icon: "🍽️" },
-    { id: "transport", name: "Transportation", icon: "🚗" },
-    { id: "entertainment", name: "Entertainment", icon: "🎬" },
-    { id: "supplies", name: "School Supplies", icon: "📚" },
-    { id: "utilities", name: "Utilities", icon: "⚡" },
-    { id: "other", name: "Other", icon: "📦" },
+    { id: "Food", name: "Food", icon: "🍽️" },
+    { id: "Transportation", name: "Transportation", icon: "🚗" },
+    { id: "Recreation", name: "Recreation", icon: "🎬" },
+    { id: "Housing", name: "Housing", icon: "🏠" },
+    { id: "Utilities", name: "Utilities", icon: "⚡" },
+    { id: "Personal Care", name: "Personal Care", icon: "🧴" },
+    { id: "Saving", name: "Saving", icon: "💰" },
+    { id: "Debts", name: "Debts", icon: "💳" },
+    { id: "Clothing", name: "Clothing", icon: "👕" },
+    { id: "Paycheck", name: "Paycheck", icon: "💵" },
   ];
 
   // Load user groups from API
@@ -102,7 +97,76 @@ export default function SharedWishlistPage() {
     }
   };
 
-  // Persist wishlist to localStorage whenever it changes
+  // Load all wishlist items from API (personal and group items)
+  const loadAllWishlistItems = async () => {
+    try {
+      const token = api.getToken();
+      if (!token) {
+        // If not logged in, fall back to localStorage for demo purposes
+        if (typeof window !== "undefined") {
+          try {
+            const localItems = JSON.parse(localStorage.getItem("wishlist") || "[]");
+            setWishlist(localItems);
+          } catch {
+            setWishlist([]);
+          }
+        }
+        return;
+      }
+
+      // Load personal items
+      const personalResponse = await api.get("shared-wishlist/personal");
+      const personalData = await personalResponse.json();
+      
+      // Convert personal items to frontend format
+      const personalItems: WishlistItem[] = personalData.items.map((item: any) => ({
+        id: item.item_id,
+        name: item.item,
+        notes: item.notes || "",
+        list: "personal", // Personal items have group_id as null
+        purchased: !!item.purchased,
+      }));
+
+      // Load group items for each group the user is in
+      const groupItems: WishlistItem[] = [];
+      for (const group of groups) {
+        try {
+          const groupResponse = await api.get(`shared-wishlist/group/${group.group_id}`);
+          const groupData = await groupResponse.json();
+          
+          // Convert group items to frontend format
+          const itemsForGroup: WishlistItem[] = groupData.items.map((item: any) => ({
+            id: item.item_id,
+            name: item.item,
+            notes: item.notes || "",
+            list: group.group_id, // Group items have group_id
+            purchased: !!item.purchased,
+          }));
+          
+          groupItems.push(...itemsForGroup);
+        } catch (err) {
+          console.error(`Failed to load items for group ${group.group_id}:`, err);
+          // Continue loading other groups even if one fails
+        }
+      }
+
+      // Combine all items
+      setWishlist([...personalItems, ...groupItems]);
+    } catch (err) {
+      console.error("Failed to load wishlist items:", err);
+      // Fall back to localStorage on error
+      if (typeof window !== "undefined") {
+        try {
+          const localItems = JSON.parse(localStorage.getItem("wishlist") || "[]");
+          setWishlist(localItems);
+        } catch {
+          setWishlist([]);
+        }
+      }
+    }
+  };
+
+  // Persist wishlist to localStorage whenever it changes (as fallback for non-logged-in users)
   useEffect(() => {
     localStorage.setItem("wishlist", JSON.stringify(wishlist));
     // Also ensure openCards includes all lists (when wishlist changes)
@@ -125,10 +189,17 @@ export default function SharedWishlistPage() {
     });
   }, [wishlist]);
 
-  // Initialize groups on mount
+  // Initialize groups and wishlist on mount
   useEffect(() => {
     loadUserGroups();
   }, []);
+
+  // Load wishlist items after groups are loaded
+  useEffect(() => {
+    if (groups.length > 0) {
+      loadAllWishlistItems();
+    }
+  }, [groups]);
 
   // Also ensure openCards includes groups when groups load
   useEffect(() => {
@@ -157,16 +228,28 @@ export default function SharedWishlistPage() {
         };
         const resp = await api.post("shared-wishlist/personal", payload);
         const created = await resp.json();
-        const added: WishlistItem = {
-          id: created.shared_wishlist_item_id || created.item_id,
-          name: created.item,
-          notes: created.notes || "",
-          list: "personal",
-          purchased: !!created.purchased,
-        };
-        setWishlist([added, ...wishlist]);
+        
+        // Refresh the wishlist from API to get the latest data
+        await loadAllWishlistItems();
       } else {
-        alert("Adding to group wishlist is not implemented yet.");
+        // Call backend to create a group wishlist item
+        const selectedGroupObj = groups.find(g => g.group_id === selectedList);
+        if (!selectedGroupObj) {
+          alert("Selected group not found.");
+          return;
+        }
+        
+        const payload = {
+          item_id: crypto.randomUUID(),
+          item: newItem,
+          group_id: selectedList, // Use the group_id
+          notes: notes || undefined,
+        };
+        const resp = await api.post("shared-wishlist/group", payload);
+        const created = await resp.json();
+        
+        // Refresh the wishlist from API to get the latest data
+        await loadAllWishlistItems();
       }
     } catch (err) {
       console.error("Failed to add wishlist item:", err);
@@ -206,24 +289,70 @@ export default function SharedWishlistPage() {
   // Per-card actions (operate only on selected items within that card)
   const cardSelectedIds = (listId: string) => selectedIds.filter((id) => grouped.get(listId)?.some((i) => i.id === id));
 
-  const handleCardMarkPurchased = (listId: string) => {
+  const handleCardMarkPurchased = async (listId: string) => {
     const ids = cardSelectedIds(listId);
     if (ids.length === 0) {
       alert("Please select at least one item in this list to mark as purchased.");
       return;
     }
-    setWishlist((prev) => prev.map((w) => (ids.includes(w.id) ? { ...w, purchased: true } : w)));
-    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+
+    try {
+      const token = api.getToken();
+      if (!token) {
+        alert("Please log in to mark items as purchased");
+        return;
+      }
+
+      // Call the API to mark each selected item as purchased
+      const markPromises = ids.map(async (id) => {
+        const response = await api.post(`shared-wishlist/${id}/mark-purchased`);
+        return response;
+      });
+
+      await Promise.all(markPromises);
+
+      // Update local state to reflect the changes
+      setWishlist((prev) => prev.map((w) => (ids.includes(w.id) ? { ...w, purchased: true } : w)));
+      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+
+      alert("Successfully marked items as purchased!");
+    } catch (error) {
+      console.error("Error marking items as purchased:", error);
+      alert("Failed to mark items as purchased. Please try again.");
+    }
   };
 
-  const handleCardDelete = (listId: string) => {
+  const handleCardDelete = async (listId: string) => {
     const ids = cardSelectedIds(listId);
     if (ids.length === 0) {
       alert("Please select at least one item in this list to delete.");
       return;
     }
-    setWishlist((prev) => prev.filter((w) => !ids.includes(w.id)));
-    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+
+    try {
+      const token = api.getToken();
+      if (!token) {
+        alert("Please log in to delete items");
+        return;
+      }
+
+      // Call the API to delete each selected item
+      const deletePromises = ids.map(async (id) => {
+        const response = await api.delete(`shared-wishlist/${id}`);
+        return response;
+      });
+
+      await Promise.all(deletePromises);
+
+      // Update local state to remove deleted items
+      setWishlist((prev) => prev.filter((w) => !ids.includes(w.id)));
+      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+
+      alert("Successfully deleted items!");
+    } catch (error) {
+      console.error("Error deleting items:", error);
+      alert("Failed to delete items. Please try again.");
+    }
   };
 
   // Open move modal for items in this card
@@ -267,48 +396,85 @@ export default function SharedWishlistPage() {
     }
   };
 
-  const confirmMoveToExpenses = (e: React.FormEvent) => {
+  const confirmMoveToExpenses = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !category || !date) {
       alert("Please fill amount, category and date.");
       return;
     }
 
-    const expenses: Expense[] = JSON.parse(localStorage.getItem("expenses") || "[]");
+    try {
+      const token = api.getToken();
+      if (!token) {
+        alert("Please log in to move items to expenses");
+        return;
+      }
 
-    const newExpenses: Expense[] = moveTargetIds.map((id) => {
-      const item = wishlist.find((w) => w.id === id)!;
-      return {
-        id: crypto.randomUUID(),
-        amount: parseFloat(amount),
-        category,
-        description: description || item.name + (item.notes ? ` - ${item.notes}` : ""),
-        date,
-        type: expenseType,
-        groupId: expenseType === "group" ? selectedGroup || undefined : undefined,
-        participants: participants.length > 0 ? participants : undefined,
-        receiptUrl: receiptFile ? URL.createObjectURL(receiptFile) : undefined,
-      };
-    });
+      // Create expenses for each selected wishlist item
+      const expensePromises = moveTargetIds.map(async (id) => {
+        const item = wishlist.find((w) => w.id === id)!;
+        
+        const expenseData = {
+          amount_dollars: parseFloat(amount),
+          credit: false,
+          category,
+          description: description || item.name + (item.notes ? ` - ${item.notes}` : ""),
+          created_at: date,
+          // Group expense specific fields
+          is_group_expense: expenseType === "group",
+          group_id: expenseType === "group" ? selectedGroup : undefined,
+          participant_user_ids: expenseType === "group" ? participants : [],
+        };
 
-    localStorage.setItem("expenses", JSON.stringify([...newExpenses, ...expenses]));
+        const response = await api.post("expenses/", expenseData);
+        const createdExpense = await response.json();
 
-    // mark wishlist items as purchased
-    setWishlist((prev) => prev.map((w) => (moveTargetIds.includes(w.id) ? { ...w, purchased: true } : w)));
+        return {
+          id: createdExpense.id,
+          amount: createdExpense.amount_dollars,
+          category: createdExpense.category,
+          description: createdExpense.description || "",
+          date,
+          type: expenseType,
+          groupId: expenseType === "group" ? selectedGroup : undefined,
+          participants: expenseType === "group" ? participants : [],
+          receiptUrl: receiptFile ? URL.createObjectURL(receiptFile) : undefined,
+        };
+      });
 
-    // reset state
-    setSelectedIds((prev) => prev.filter((id) => !moveTargetIds.includes(id)));
-    setMoveTargetIds([]);
-    setAmount("");
-    setCategory("");
-    setDate("");
-    setDescription("");
-    setExpenseType("personal");
-    setSelectedGroup("");
-    setParticipants([]);
-    setReceiptFile(null);
-    setIsParticipantDropdownOpen(false);
-    setShowMoveForm(false);
+      // Wait for all expenses to be created
+      await Promise.all(expensePromises);
+
+      // Mark wishlist items as purchased in the database
+      const markPurchasedPromises = moveTargetIds.map(async (id) => {
+        const response = await api.post(`shared-wishlist/${id}/mark-purchased`);
+        return response;
+      });
+
+      await Promise.all(markPurchasedPromises);
+
+      // Update local state to reflect the changes
+      setWishlist((prev) => prev.map((w) => (moveTargetIds.includes(w.id) ? { ...w, purchased: true } : w)));
+
+      // reset state
+      setSelectedIds((prev) => prev.filter((id) => !moveTargetIds.includes(id)));
+      setMoveTargetIds([]);
+      setAmount("");
+      setCategory("");
+      setDate("");
+      setDescription("");
+      setExpenseType("personal");
+      setSelectedGroup("");
+      setParticipants([]);
+      setReceiptFile(null);
+      setIsParticipantDropdownOpen(false);
+      setShowMoveForm(false);
+
+      alert("Successfully moved items to expenses!");
+    } catch (error) {
+      console.error("Error moving items to expenses:", error);
+      alert("Failed to move items to expenses. Please try again.");
+    }
   };
 
   // Toggle open/closed for a card

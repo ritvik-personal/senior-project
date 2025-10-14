@@ -246,8 +246,10 @@ export default function ExpenseTrackingPage() {
           category: selectedCategory,
           description,
           created_at: expenseDate,
+          // Group expense specific fields
+          is_group_expense: expenseType === "group",
           group_id: expenseType === "group" ? selectedGroup : undefined,
-          participants: expenseType === "group" ? participants : [],
+          participant_user_ids: expenseType === "group" ? participants : [],
         };
 
         const response = await api.post("expenses/", expenseData);
