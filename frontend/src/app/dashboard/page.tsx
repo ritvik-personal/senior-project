@@ -37,6 +37,7 @@ export default function Dashboard() {
   const [monthlyExpensesTotal, setMonthlyExpensesTotal] = useState<number>(0);
   const [overallExpensesTotal, setOverallExpensesTotal] = useState<number>(0);
 
+
   useEffect(() => {
     // Check if user is logged in and verify token
     const userData = localStorage.getItem("user");
@@ -88,6 +89,7 @@ export default function Dashboard() {
 
     fetchOverallExpenses();
   }, []);
+
 
   const handleLogout = async () => {
     try {
