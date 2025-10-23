@@ -26,9 +26,10 @@ import BudgetingTemplatesPage from "./features/budgeting-templates/page";
 import SharedWishlistPage from "./features/shared-wishlist/page";
 import CreditCardToolPage from "./features/credit-card-tool/page";
 import InvestmentInsightsPage from "./features/investment-insights/page";
+import GroupSettlingPage from "./features/group-settling/page";
 
 // Feature toggle types
-type FeatureTab = 'overview' | 'expense-tracking' | 'budgeting-templates' | 'shared-wishlist' | 'credit-card-tool' | 'investment-insights';
+type FeatureTab = 'overview' | 'expense-tracking' | 'budgeting-templates' | 'shared-wishlist' | 'credit-card-tool' | 'investment-insights' | 'group-settling';
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
@@ -227,6 +228,16 @@ export default function Dashboard() {
                   </div>
                 </button>
 
+                <button
+                  onClick={() => setActiveTab('group-settling')}
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                >
+                  <div className="text-center">
+                    <span className="text-3xl mb-2 block">💰</span>
+                    <p className="font-medium">Group Settling</p>
+                  </div>
+                </button>
+
                 <Link
                   href="/dashboard/features/groups"
                   className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors text-center"
@@ -254,6 +265,9 @@ export default function Dashboard() {
 
       case 'investment-insights':
         return <InvestmentInsightsPage />;
+
+      case 'group-settling':
+        return <GroupSettlingPage />;
 
       default:
         return null;
