@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/utils/api";
@@ -29,6 +29,35 @@ interface Transaction {
   }[];
 }
 
+interface BackendGroupedTransaction {
+  group_id: string;
+  user_owed: string;
+  user_owing_list: string[];
+  amount_per_person: number;
+  total_amount: number;
+  participant_count: number;
+  created_at: string;
+  transaction_ids: number[];
+  notes?: string;
+}
+
+interface BackendResponse {
+  transactions: BackendGroupedTransaction[];
+  transactions_by_group: Record<string, BackendGroupedTransaction[]>;
+  user_balance: number;
+  total_owed: number;
+  total_owing: number;
+  groups: Array<{
+    group_id: string;
+    group_information?: {
+      group_name: string;
+      group_code: string;
+      created_by: string;
+    };
+  }>;
+  user_emails: Record<string, string>; // Maps user_id to email
+}
+
 // Helper function to parse the JWT and extract the user ID
 function getUserIdFromToken(token: string): string | null {
   try {
@@ -48,86 +77,141 @@ export default function GroupSettlingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [transactionsByGroup, setTransactionsByGroup] = useState<Record<string, BackendGroupedTransaction[]>>({});
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({});
 
-  // Mock data for demonstration - replace with actual API calls
-  const mockGroupSettlements: GroupSettlement[] = [
-    {
-      group_id: "1",
-      group_name: "Roommates",
-      group_code: "RM001",
-      balance: 45.50,
-      total_transactions: 12,
-      last_activity: "2024-01-15T10:30:00Z"
-    },
-    {
-      group_id: "2", 
-      group_name: "Study Group",
-      group_code: "SG002",
-      balance: -23.75,
-      total_transactions: 8,
-      last_activity: "2024-01-14T15:45:00Z"
-    },
-    {
-      group_id: "3",
-      group_name: "Gym Buddies",
-      group_code: "GB003", 
-      balance: 0.00,
-      total_transactions: 5,
-      last_activity: "2024-01-13T09:20:00Z"
+  // Helper function to get user display name
+  const getUserDisplayName = (user_id: string, currentUserId: string, emails: Record<string, string>): string => {
+    if (user_id === currentUserId) {
+      return "You";
     }
-  ];
+    // Return email if available, otherwise fallback to truncated user ID
+    return emails[user_id] || `User ${user_id.slice(0, 8)}`;
+  };
 
-  const mockTransactions: Transaction[] = [
-    {
-      transaction_id: "1",
-      group_id: "1",
-      payer_id: "user1",
-      payer_name: "Alice",
-      amount: 120.00,
-      description: "Grocery shopping",
-      created_at: "2024-01-15T10:30:00Z",
-      participants: [
-        { user_id: "user1", user_name: "Alice", amount_owed: 0 },
-        { user_id: "user2", user_name: "Bob", amount_owed: 40.00 },
-        { user_id: "user3", user_name: "Charlie", amount_owed: 40.00 },
-        { user_id: "user4", user_name: "Diana", amount_owed: 40.00 }
-      ]
-    },
-    {
-      transaction_id: "2",
-      group_id: "1",
-      payer_id: "user2",
-      payer_name: "Bob",
-      amount: 60.00,
-      description: "Utilities bill",
-      created_at: "2024-01-14T15:45:00Z",
-      participants: [
-        { user_id: "user1", user_name: "Alice", amount_owed: 15.00 },
-        { user_id: "user2", user_name: "Bob", amount_owed: 0 },
-        { user_id: "user3", user_name: "Charlie", amount_owed: 15.00 },
-        { user_id: "user4", user_name: "Diana", amount_owed: 15.00 }
-      ]
+  // Transform backend transaction to frontend format
+  const transformTransaction = (
+    backendTrans: BackendGroupedTransaction,
+    userId: string,
+    emails: Record<string, string>
+  ): Transaction => {
+    const payerId = backendTrans.user_owed;
+    
+    // Create participants list
+    const participants = [
+      {
+        user_id: payerId,
+        user_name: getUserDisplayName(payerId, userId, emails),
+        amount_owed: 0,
+      },
+      ...backendTrans.user_owing_list.map((owingId) => ({
+        user_id: owingId,
+        user_name: getUserDisplayName(owingId, userId, emails),
+        amount_owed: backendTrans.amount_per_person,
+      })),
+    ];
+
+    return {
+      transaction_id: backendTrans.transaction_ids.join(","),
+      group_id: backendTrans.group_id,
+      payer_id: payerId,
+      payer_name: getUserDisplayName(payerId, userId, emails),
+      amount: backendTrans.total_amount,
+      description: backendTrans.notes || `Split expense - ${backendTrans.participant_count} people`,
+      created_at: backendTrans.created_at,
+      participants,
+    };
+  };
+
+  // Calculate balance for a specific group
+  const calculateGroupBalance = useCallback((
+    groupId: string,
+    userId: string,
+    backendTransactions: BackendGroupedTransaction[]
+  ): number => {
+    let balance = 0;
+    for (const trans of backendTransactions) {
+      if (trans.group_id === groupId) {
+        if (trans.user_owed === userId) {
+          // You're owed money from others
+          balance += trans.amount_per_person * trans.user_owing_list.length;
+        }
+        if (trans.user_owing_list.includes(userId)) {
+          // You owe money to the payer
+          balance -= trans.amount_per_person;
+        }
+      }
     }
-  ];
+    return balance;
+  }, []);
 
-  useEffect(() => {
-    const token = api.getToken();
-    if (token) {
+  // Fetch transactions and groups from backend
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const token = api.getToken();
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
       const id = getUserIdFromToken(token);
       setUserId(id);
-      // For now, use mock data
-      setGroupSettlements(mockGroupSettlements);
+
+      const response = await api.get("transactions/settlements/me");
+      const data: BackendResponse = await response.json();
+
+      console.log("API Response:", data);
+      console.log("User emails:", data.user_emails);
+
+      // Store transactions by group and user emails
+      setTransactionsByGroup(data.transactions_by_group || {});
+      setUserEmails(data.user_emails || {});
+
+      // Transform groups to GroupSettlement format
+      const groupSettlementsData: GroupSettlement[] = (data.groups || []).map((group) => {
+        const groupTrans = data.transactions_by_group[group.group_id] || [];
+        const balance = calculateGroupBalance(group.group_id, id || "", data.transactions);
+        const lastActivity = groupTrans.length > 0 
+          ? groupTrans[0].created_at 
+          : new Date().toISOString();
+
+        return {
+          group_id: group.group_id,
+          group_name: group.group_information?.group_name || "Unnamed Group",
+          group_code: group.group_information?.group_code || "N/A",
+          balance: balance,
+          total_transactions: groupTrans.length,
+          last_activity: lastActivity,
+        };
+      });
+
+      setGroupSettlements(groupSettlementsData);
+    } catch (err) {
+      console.error("Error fetching transactions:", err);
+      setError("Failed to load transactions. Please try again.");
+    } finally {
       setLoading(false);
-    } else {
-      router.push("/login");
     }
-  }, [router]);
+  }, [router, calculateGroupBalance]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
   const handleGroupClick = (group: GroupSettlement) => {
     setSelectedGroup(group);
-    // Filter transactions for the selected group
-    const groupTransactions = mockTransactions.filter(t => t.group_id === group.group_id);
-    setTransactions(groupTransactions);
+    // Get transactions for the selected group and transform them
+    const groupBackendTrans = transactionsByGroup[group.group_id] || [];
+    console.log("Group transactions:", groupBackendTrans);
+    console.log("User emails for transformation:", userEmails);
+    const transformedTransactions = groupBackendTrans.map((trans) =>
+      transformTransaction(trans, userId || "", userEmails)
+    );
+    console.log("Transformed transactions:", transformedTransactions);
+    setTransactions(transformedTransactions);
   };
 
   const handleBackToGroups = () => {
@@ -234,6 +318,17 @@ export default function GroupSettlingPage() {
           <p className="text-gray-600 dark:text-gray-300">
             Track and settle expenses with your groups
           </p>
+          {error && (
+            <div className="mt-4 bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded">
+              {error}
+              <button
+                onClick={fetchTransactions}
+                className="ml-4 underline hover:no-underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
 
         {!selectedGroup ? (
