@@ -86,6 +86,7 @@ export default function GroupSettlingPage() {
   const [memberInfos, setMemberInfos] = useState<Record<string, string>>({});
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
+  const [whoOwesWho, setWhoOwesWho] = useState<Array<{ user_id: string; name: string; net_amount: number }>>([]);
 
   // Helper function to get user display name
   const getUserDisplayName = (user_id: string, currentUserId: string, emails: Record<string, string>): string => {
@@ -255,6 +256,49 @@ export default function GroupSettlingPage() {
       prev.includes(memberId) ? prev.filter((m) => m !== memberId) : [...prev, memberId]
     );
   };
+
+  // Compute who owes whom relative to current user for selected group
+  useEffect(() => {
+    if (!userId || !selectedGroup) {
+      setWhoOwesWho([]);
+      return;
+    }
+
+    const balances: Record<string, number> = {};
+
+    for (const tx of transactions) {
+      const payerId = tx.payer_id;
+      const owingParticipants = tx.participants.filter(p => p.amount_owed > 0);
+
+      if (payerId === userId) {
+        // Others owe current user
+        for (const p of owingParticipants) {
+          balances[p.user_id] = (balances[p.user_id] || 0) + p.amount_owed;
+        }
+      } else {
+        // If current user owes the payer
+        const me = owingParticipants.find(p => p.user_id === userId);
+        if (me) {
+          balances[payerId] = (balances[payerId] || 0) - me.amount_owed;
+        }
+      }
+    }
+
+    const rows = Object.entries(balances)
+      .filter(([, amount]) => Math.abs(amount) > 0.0001)
+      .map(([uid, amount]) => ({
+        user_id: uid,
+        name: getUserDisplayName(uid, userId, userEmails),
+        net_amount: amount,
+      }))
+      // Sort: people you owe first (negative), then owed to you (positive), largest magnitude first
+      .sort((a, b) => {
+        if (a.net_amount === b.net_amount) return Math.abs(b.net_amount) - Math.abs(a.net_amount);
+        return a.net_amount - b.net_amount;
+      });
+
+    setWhoOwesWho(rows);
+  }, [transactions, userId, selectedGroup, userEmails]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -472,6 +516,39 @@ export default function GroupSettlingPage() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Who Owes Whom Summary */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Who owes whom</h3>
+              {whoOwesWho.length === 0 ? (
+                <div className="text-gray-600 dark:text-gray-300">No outstanding balances within this group.</div>
+              ) : (
+                <div className="space-y-2">
+                  {whoOwesWho.map((row) => (
+                    <div
+                      key={row.user_id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-200">
+                          {row.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="text-gray-900 dark:text-white font-medium">{row.name}</div>
+                      </div>
+                      {row.net_amount > 0 ? (
+                        <span className="text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-md text-sm font-semibold">
+                          owes you ${Math.abs(row.net_amount).toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 px-3 py-1 rounded-md text-sm font-semibold">
+                          you owe ${Math.abs(row.net_amount).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Transactions */}
