@@ -393,12 +393,16 @@ export default function GroupSettlingPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Group Settling
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Track and settle expenses with your groups
-          </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Group Settling
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                Track and settle expenses with your groups
+              </p>
+            </div>
+          </div>
           {error && (
             <div className="mt-4 bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 px-4 py-3 rounded">
               {error}
@@ -520,7 +524,20 @@ export default function GroupSettlingPage() {
 
             {/* Who Owes Whom Summary */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Who owes whom</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Who owes whom</h3>
+                <button
+                  onClick={() => {
+                    setSettleGroupId(selectedGroup?.group_id || null);
+                    setSelectedParticipants([]);
+                    setSettleAmount("");
+                    setIsSettleDialogOpen(true);
+                  }}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Settle Up
+                </button>
+              </div>
               {whoOwesWho.length === 0 ? (
                 <div className="text-gray-600 dark:text-gray-300">No outstanding balances within this group.</div>
               ) : (
@@ -553,9 +570,19 @@ export default function GroupSettlingPage() {
 
             {/* Transactions */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Recent Transactions
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Recent Transactions
+                </h3>
+                <button
+                  onClick={() => {
+                    router.push(`/dashboard?tab=expense-tracking`);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Add Transaction
+                </button>
+              </div>
               {transactions.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-2">📝</div>
@@ -616,29 +643,7 @@ export default function GroupSettlingPage() {
               )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex space-x-4">
-              <button
-                onClick={() => {
-                  // Navigate to expenses tab only
-                  router.push(`/dashboard?tab=expense-tracking`);
-                }}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Add Transaction
-              </button>
-              <button
-                onClick={() => {
-                  setSettleGroupId(selectedGroup?.group_id || null);
-                  setSelectedParticipants([]);
-                  setSettleAmount("");
-                  setIsSettleDialogOpen(true);
-                }}
-                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Settle Up
-              </button>
-            </div>
+            {/* Action Buttons moved to top-right header */}
 
             {/* Settle Up Dialog */}
             {isSettleDialogOpen && (
