@@ -43,11 +43,15 @@ class CreditCard(BaseModel):
     apr: float
     credit_score_min: int
     credit_score_max: int
-    rewards: RewardsInfo
+    rewards_type: RewardsType
+    rewards_rate: float
+    rewards_categories: List[str]
     perks: List[str]
     approval_likelihood: ApprovalLikelihood
     student_friendly: bool
     description: str
+    application_url: str
+    terms_url: str
 
 class QuestionnaireAnswers(BaseModel):
     credit_score: int

@@ -35,15 +35,15 @@ interface CreditCard {
   apr: number;
   credit_score_min: number;
   credit_score_max: number;
-  rewards: {
-    type: 'cashback' | 'points' | 'miles';
-    rate: number;
-    categories: string[];
-  };
+  rewards_type: 'cashback' | 'points' | 'miles';
+  rewards_rate: number;
+  rewards_categories: string[];
   perks: string[];
   approval_likelihood: 'low' | 'medium' | 'high';
   student_friendly: boolean;
   description: string;
+  application_url: string;
+  terms_url: string;
 }
 
 interface CreditCardRecommendation {
@@ -595,7 +595,7 @@ export default function CreditCardToolPage() {
                             <div className="text-sm font-medium text-green-700 dark:text-green-300">Rewards Rate</div>
                           </div>
                           <div className="text-2xl font-bold text-green-900 dark:text-green-100">
-                            {card.rewards.rate}% {card.rewards.type}
+                            {card.rewards_rate}% {card.rewards_type}
                           </div>
                         </div>
                         <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
@@ -748,19 +748,19 @@ export default function CreditCardToolPage() {
                   <div className="flex justify-between items-center p-3 bg-white/50 dark:bg-gray-800/50 rounded-xl">
                     <span className="text-gray-600 dark:text-gray-300 font-medium">Rewards Type:</span>
                     <span className="font-bold text-lg text-green-900 dark:text-green-100 capitalize">
-                      {selectedCreditCard.rewards.type}
+                      {selectedCreditCard.rewards_type}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-white/50 dark:bg-gray-800/50 rounded-xl">
                     <span className="text-gray-600 dark:text-gray-300 font-medium">Rewards Rate:</span>
                     <span className="font-bold text-lg text-green-900 dark:text-green-100">
-                      {selectedCreditCard.rewards.rate}%
+                      {selectedCreditCard.rewards_rate}%
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gradient-to-r from-green-200 to-emerald-200 dark:from-green-800 dark:to-emerald-800 rounded-xl">
                     <span className="text-gray-700 dark:text-gray-200 font-medium">Your Projected Annual Rewards:</span>
                     <span className="font-bold text-xl text-green-800 dark:text-green-200">
-                      ${(creditCardAnswers.monthlySpending * 12 * selectedCreditCard.rewards.rate / 100).toFixed(2)}
+                      ${(creditCardAnswers.monthlySpending * 12 * selectedCreditCard.rewards_rate / 100).toFixed(2)}
                     </span>
                   </div>
                 </div>
