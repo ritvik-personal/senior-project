@@ -43,7 +43,7 @@ interface MemberInfo {
   email?: string;
 }
 
-export default function ExpenseTrackingPage() {
+export default function ExpenseTrackingPage({ initialShowAddForm = false }: { initialShowAddForm?: boolean }) {
   const [expenses, setExpenses] = useState<Expense[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -101,6 +101,13 @@ export default function ExpenseTrackingPage() {
     }
     // No 'else' needed, as other functions already handle the non-logged-in case
   }, []);
+
+  // Open Add Expense form if requested by parent
+  useEffect(() => {
+    if (initialShowAddForm) {
+      setShowAddForm(true);
+    }
+  }, [initialShowAddForm]);
 
   // Load user's groups from backend when expense type switches to group
   useEffect(() => {

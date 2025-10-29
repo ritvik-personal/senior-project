@@ -79,6 +79,13 @@ export default function GroupSettlingPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [transactionsByGroup, setTransactionsByGroup] = useState<Record<string, BackendGroupedTransaction[]>>({});
   const [userEmails, setUserEmails] = useState<Record<string, string>>({});
+  const [isSettleDialogOpen, setIsSettleDialogOpen] = useState(false);
+  const [settleAmount, setSettleAmount] = useState("");
+  const [settleGroupId, setSettleGroupId] = useState<string | null>(null);
+  const [groupMembers, setGroupMembers] = useState<string[]>([]);
+  const [memberInfos, setMemberInfos] = useState<Record<string, string>>({});
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
 
   // Helper function to get user display name
   const getUserDisplayName = (user_id: string, currentUserId: string, emails: Record<string, string>): string => {
@@ -217,6 +224,36 @@ export default function GroupSettlingPage() {
   const handleBackToGroups = () => {
     setSelectedGroup(null);
     setTransactions([]);
+  };
+
+  // Load members for current group for Settle Up dialog
+  useEffect(() => {
+    const loadMembers = async () => {
+      try {
+        const gid = selectedGroup?.group_id || null;
+        if (!gid) return;
+        const resp = await api.get(`groups/${gid}/members?exclude_self=false`);
+        const data = await resp.json();
+        const ids = (data || []).map((m: any) => m.user_id);
+        const emails: Record<string, string> = {};
+        (data || []).forEach((m: any) => {
+          if (m.email) emails[m.user_id] = m.email;
+        });
+        setGroupMembers(ids);
+        setMemberInfos(emails);
+      } catch (e) {
+        console.error("Failed to load group members:", e);
+        setGroupMembers([]);
+      }
+    };
+
+    loadMembers();
+  }, [selectedGroup]);
+
+  const handleToggleParticipant = (memberId: string) => {
+    setSelectedParticipants((prev) =>
+      prev.includes(memberId) ? prev.filter((m) => m !== memberId) : [...prev, memberId]
+    );
   };
 
   const formatCurrency = (amount: number) => {
@@ -504,16 +541,131 @@ export default function GroupSettlingPage() {
 
             {/* Action Buttons */}
             <div className="flex space-x-4">
-              <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+              <button
+                onClick={() => {
+                  // Navigate to expenses tab only
+                  router.push(`/dashboard?tab=expense-tracking`);
+                }}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
                 Add Transaction
               </button>
-              <button className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors">
+              <button
+                onClick={() => {
+                  setSettleGroupId(selectedGroup?.group_id || null);
+                  setSelectedParticipants([]);
+                  setSettleAmount("");
+                  setIsSettleDialogOpen(true);
+                }}
+                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+              >
                 Settle Up
               </button>
-              <button className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors">
-                Export Report
-              </button>
             </div>
+
+            {/* Settle Up Dialog */}
+            {isSettleDialogOpen && (
+              <div className={`fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50`}>
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 relative">
+                  <button
+                    onClick={() => setIsSettleDialogOpen(false)}
+                    className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+                  >
+                    ✖
+                  </button>
+
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Settle Up</h3>
+
+                  <div className="space-y-4">
+                    {/* Group Select */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Group</label>
+                      <select
+                        value={settleGroupId || ''}
+                        onChange={(e) => setSettleGroupId(e.target.value || null)}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
+                      >
+                        <option value="">Select group</option>
+                        {groupSettlements.map((g) => (
+                          <option key={g.group_id} value={g.group_id}>{g.group_name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Participants Select */}
+                    <div className="relative">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Participants</label>
+                      <button
+                        type="button"
+                        onClick={() => setIsParticipantDropdownOpen(!isParticipantDropdownOpen)}
+                        className="w-full flex justify-between items-center rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-left"
+                      >
+                        <span className="truncate">
+                          {selectedParticipants.length > 0
+                            ? selectedParticipants.map((id) => memberInfos[id] || id).join(", ")
+                            : "Select participants"}
+                        </span>
+                        <svg className={`w-5 h-5 transition-transform ${isParticipantDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                      </button>
+                      {isParticipantDropdownOpen && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-auto">
+                          <ul>
+                            {groupMembers.map((memberId) => (
+                              <li
+                                key={memberId}
+                                onClick={() => handleToggleParticipant(memberId)}
+                                className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                              >
+                                <span>{memberInfos[memberId] || userEmails[memberId] || memberId}</span>
+                                {selectedParticipants.includes(memberId) && (
+                                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                                  </svg>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Amount */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Amount ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={settleAmount}
+                        onChange={(e) => setSettleAmount(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+
+                    <div className="flex justify-end space-x-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsSettleDialogOpen(false)}
+                        className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                        onClick={() => {
+                          // Placeholder: implement settlement action later
+                          setIsSettleDialogOpen(false);
+                        }}
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

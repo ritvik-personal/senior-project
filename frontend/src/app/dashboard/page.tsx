@@ -17,6 +17,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/utils/api";
 
@@ -26,10 +27,9 @@ import BudgetingTemplatesPage from "./features/budgeting-templates/page";
 import SharedWishlistPage from "./features/shared-wishlist/page";
 import CreditCardToolPage from "./features/credit-card-tool/page";
 import InvestmentInsightsPage from "./features/investment-insights/page";
-import GroupSettlingPage from "./features/group-settling/page";
 
 // Feature toggle types
-type FeatureTab = 'overview' | 'expense-tracking' | 'budgeting-templates' | 'shared-wishlist' | 'credit-card-tool' | 'investment-insights' | 'group-settling';
+type FeatureTab = 'overview' | 'expense-tracking' | 'budgeting-templates' | 'shared-wishlist' | 'credit-card-tool' | 'investment-insights';
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
@@ -37,6 +37,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<FeatureTab>('overview');
   const [monthlyExpensesTotal, setMonthlyExpensesTotal] = useState<number>(0);
   const [overallExpensesTotal, setOverallExpensesTotal] = useState<number>(0);
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
 
   useEffect(() => {
@@ -50,6 +52,14 @@ export default function Dashboard() {
       // Optional: Verify token with backend
       // This could be implemented later for additional security
       // verifyTokenWithBackend(token);
+    }
+
+    // Initialize tab from URL if provided
+    const tabParam = searchParams?.get('tab') as FeatureTab | null;
+    if (tabParam && [
+      'overview', 'expense-tracking', 'budgeting-templates', 'shared-wishlist', 'credit-card-tool', 'investment-insights'
+    ].includes(tabParam)) {
+      setActiveTab(tabParam as FeatureTab);
     }
 
     setIsLoading(false);
@@ -228,15 +238,13 @@ export default function Dashboard() {
                   </div>
                 </button>
 
-                <button
-                  onClick={() => setActiveTab('group-settling')}
-                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                <Link
+                  href="/dashboard/features/group-settling"
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors text-center"
                 >
-                  <div className="text-center">
-                    <span className="text-3xl mb-2 block">💰</span>
-                    <p className="font-medium">Group Settling</p>
-                  </div>
-                </button>
+                  <span className="text-3xl mb-2 block">💰</span>
+                  <p className="font-medium">Group Settling</p>
+                </Link>
 
                 <Link
                   href="/dashboard/features/groups"
@@ -252,7 +260,11 @@ export default function Dashboard() {
         );
 
       case 'expense-tracking':
-        return <ExpenseTrackingPage />;
+        return (
+          <ExpenseTrackingPage
+            initialShowAddForm={searchParams?.get('openAddExpense') === '1'}
+          />
+        );
 
       case 'budgeting-templates':
         return <BudgetingTemplatesPage />;
@@ -265,9 +277,6 @@ export default function Dashboard() {
 
       case 'investment-insights':
         return <InvestmentInsightsPage />;
-
-      case 'group-settling':
-        return <GroupSettlingPage />;
 
       default:
         return null;
