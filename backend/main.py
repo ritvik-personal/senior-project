@@ -5,6 +5,10 @@ from app.config import settings
 from app.database import test_connection
 import uvicorn
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
