@@ -85,7 +85,8 @@ def create_expense(
                         group_id=group_id,
                         user_owed=user_id,  # The expense creator is owed money
                         user_owing=participant_id,  # Each participant owes money
-                        amount=amount_per_person
+                        amount=amount_per_person,
+                        notes=description  # Pass the expense notes/description
                     )
                     logger.debug(f"Created transaction: {participant_id} owes {user_id} ${amount_per_person}")
                     

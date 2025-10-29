@@ -6,6 +6,7 @@ class TransactionBase(BaseModel):
     user_owed: str
     user_owing: str
     amount: float
+    notes: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
     pass
@@ -14,6 +15,7 @@ class TransactionUpdate(BaseModel):
     user_owed: Optional[str] = None
     user_owing: Optional[str] = None
     amount: Optional[float] = None
+    notes: Optional[str] = None
 
 class TransactionResponse(TransactionBase):
     transaction_id: int
