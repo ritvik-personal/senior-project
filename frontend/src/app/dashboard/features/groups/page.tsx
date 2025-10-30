@@ -128,64 +128,13 @@ export default function GroupsPage() {
     }
   };
 
-  // 1. THIS FUNCTION IS NOW CORRECTED
-  // It matches the working implementation from your Dashboard page.
-  const handleLogout = async () => {
-    try {
-      const token = localStorage.getItem("access_token");
-      if (token) {
-        await fetch("http://localhost:8000/api/auth/logout", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-      }
-    } catch (error) {
-      console.error("Logout API call failed:", error);
-    } finally {
-      // Always clear local storage and redirect
-      localStorage.removeItem("user");
-      localStorage.removeItem("access_token");
-      window.location.href = "/login"; // Using hard redirect for consistency
-    }
-  };
+  // removed inline logout; handled globally in TopNav
 
   // Groups are already filtered by the API to only show user's groups
   const userGroups = groups;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">C</span>
-              </div>
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                CampusFin
-              </span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/dashboard"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                ← Back to Dashboard
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <div>
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Groups</h2>
