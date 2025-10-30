@@ -495,7 +495,7 @@ export default function SharedWishlistPage() {
         </div>
 
         <div className="flex space-x-3">
-          <Link href="/dashboard/features/groups" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          <Link href="/groups" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
             Manage Groups
           </Link>
 

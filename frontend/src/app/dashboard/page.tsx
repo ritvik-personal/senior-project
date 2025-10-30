@@ -20,6 +20,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/utils/api";
+import TopNav from "../components/TopNav";
 
 // Import feature components
 import ExpenseTrackingPage from "./features/expense-tracking/page";
@@ -188,58 +189,48 @@ export default function Dashboard() {
                 Quick Actions
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
-                <button
-                  onClick={() => setActiveTab('expense-tracking')}
-                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                <Link
+                  href="/expenses"
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center"
                 >
-                  <div className="text-center">
-                    <span className="text-3xl mb-2 block">📱</span>
-                    <p className="font-medium">Expense Tracking</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('budgeting-templates')}
-                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-                >
-                  <div className="text-center">
-                    <span className="text-3xl mb-2 block">📊</span>
-                    <p className="font-medium">Budget Templates</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('shared-wishlist')}
-                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors"
-                >
-                  <div className="text-center">
-                    <span className="text-3xl mb-2 block">🛒</span>
-                    <p className="font-medium">Shared Wishlist</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('credit-card-tool')}
-                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors"
-                >
-                  <div className="text-center">
-                    <span className="text-3xl mb-2 block">💳</span>
-                    <p className="font-medium">Credit Cards</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('investment-insights')}
-                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
-                >
-                  <div className="text-center">
-                    <span className="text-3xl mb-2 block">📈</span>
-                    <p className="font-medium">Investment Insights</p>
-                  </div>
-                </button>
+                  <span className="text-3xl mb-2 block">📱</span>
+                  <span className="font-medium">Expense Tracking</span>
+                </Link>
 
                 <Link
-                  href="/dashboard/features/group-settling"
+                  href="/budgeting-templates"
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors text-center"
+                >
+                  <span className="text-3xl mb-2 block">📊</span>
+                  <span className="font-medium">Budget Templates</span>
+                </Link>
+
+                <Link
+                  href="/wishlist"
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors text-center"
+                >
+                  <span className="text-3xl mb-2 block">🛒</span>
+                  <span className="font-medium">Shared Wishlist</span>
+                </Link>
+
+                <Link
+                  href="/credit-cards"
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/20 transition-colors text-center"
+                >
+                  <span className="text-3xl mb-2 block">💳</span>
+                  <span className="font-medium">Credit Cards</span>
+                </Link>
+
+                <Link
+                  href="/investment-insights"
+                  className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors text-center"
+                >
+                  <span className="text-3xl mb-2 block">📈</span>
+                  <span className="font-medium">Investment Insights</span>
+                </Link>
+
+                <Link
+                  href="/group-settling"
                   className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors text-center"
                 >
                   <span className="text-3xl mb-2 block">💰</span>
@@ -247,7 +238,7 @@ export default function Dashboard() {
                 </Link>
 
                 <Link
-                  href="/dashboard/features/groups"
+                  href="/groups"
                   className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors text-center"
                 >
                   <span className="text-3xl mb-2 block">👥</span>
@@ -307,88 +298,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">C</span>
-              </div>
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">CampusFin</span>
-            </div>
-            {/* Feature Toggle Bar */}
-            <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'overview'
-                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-              >
-                📊 Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('expense-tracking')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'expense-tracking'
-                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-              >
-                📱 Expenses
-              </button>
-              <button
-                onClick={() => setActiveTab('budgeting-templates')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'budgeting-templates'
-                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-              >
-                📊 Budget
-              </button>
-              <button
-                onClick={() => setActiveTab('shared-wishlist')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'shared-wishlist'
-                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-              >
-                🛒 Wishlist
-              </button>
-              <button
-                onClick={() => setActiveTab('credit-card-tool')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'credit-card-tool'
-                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-              >
-                💳 Cards
-              </button>
-              <button
-                onClick={() => setActiveTab('investment-insights')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'investment-insights'
-                    ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-              >
-                📈 Invest
-              </button>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700 dark:text-gray-300">
-                Welcome, {user.metadata?.name || user.email}!
-              </span>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <TopNav />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -317,26 +317,7 @@ export default function GroupSettlingPage() {
     });
   };
 
-  const handleLogout = async () => {
-    try {
-      const token = localStorage.getItem("access_token");
-      if (token) {
-        await fetch("http://localhost:8000/api/auth/logout", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-      }
-    } catch (error) {
-      console.error("Logout API call failed:", error);
-    } finally {
-      localStorage.removeItem("user");
-      localStorage.removeItem("access_token");
-      window.location.href = "/login";
-    }
-  };
+  // removed inline logout; handled globally in TopNav
 
   if (loading) {
     return (
@@ -361,37 +342,8 @@ export default function GroupSettlingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">C</span>
-              </div>
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">CampusFin</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/dashboard"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                ← Back to Dashboard
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div>
+      <main>
         <div className="mb-8">
           <div className="flex items-start justify-between">
             <div>
@@ -429,7 +381,7 @@ export default function GroupSettlingPage() {
                   You haven't joined any groups yet. Create or join a group to start tracking shared expenses.
                 </p>
                 <Link
-                  href="/dashboard/features/groups"
+                  href="/groups"
                   className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors inline-block"
                 >
                   Manage Groups
@@ -576,7 +528,7 @@ export default function GroupSettlingPage() {
                 </h3>
                 <button
                   onClick={() => {
-                    router.push(`/dashboard?tab=expense-tracking`);
+                    router.push(`/expenses?openAddExpense=1`);
                   }}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
