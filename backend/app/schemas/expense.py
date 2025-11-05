@@ -25,12 +25,19 @@ class ExpenseUpdate(BaseModel):
     description: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     created_at: Optional[date] = None
+    # Group expense fields for editing
+    participant_user_ids: Optional[List[str]] = None
 
 class ExpenseResponse(ExpenseBase):
     id: str  # Changed from int to str since database uses UUID
     user_id: str
     created_at: str
     updated_at: Optional[str] = None  # Made optional since it might be None
+    # Group expense fields
+    is_group_expense: Optional[bool] = False
+    group_id: Optional[str] = None
+    participant_user_ids: Optional[List[str]] = None
+    participant_emails: Optional[Dict[str, str]] = None  # Maps user_id to email
 
     class Config:
         from_attributes = True

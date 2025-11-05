@@ -42,6 +42,33 @@ async def create_expense_endpoint(
             group_id=expense.group_id,
             participant_user_ids=expense.participant_user_ids
         )
+        
+        # If this is a group expense, fetch participant emails
+        if expense.is_group_expense and expense.group_id and expense.participant_user_ids:
+            try:
+                from app.database import get_authenticated_client
+                supabase_client = get_authenticated_client(access_token)
+                
+                group_members_response = supabase_client.rpc('get_group_members_with_emails', {
+                    'target_group_id': expense.group_id
+                }).execute()
+                
+                if group_members_response.data:
+                    participant_emails = {}
+                    for member in group_members_response.data:
+                        member_id = member.get("user_id")
+                        email = member.get("email")
+                        if member_id in expense.participant_user_ids and email:
+                            participant_emails[member_id] = email
+                    result["participant_emails"] = participant_emails
+                    result["is_group_expense"] = True
+                    result["group_id"] = expense.group_id
+                    result["participant_user_ids"] = expense.participant_user_ids
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to fetch participant emails: {e}")
+        
         return ExpenseResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

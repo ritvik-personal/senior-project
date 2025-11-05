@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/", response_model=TransactionResponse)
-async def create_transaction_endpoint(transaction: TransactionCreate):
+async def create_transaction_endpoint(
+    transaction: TransactionCreate,
+    access_token: str = Depends(get_access_token)
+):
     """Create a new transaction"""
     try:
         result = create_transaction(
@@ -36,14 +39,16 @@ async def create_transaction_endpoint(transaction: TransactionCreate):
             user_owed=transaction.user_owed,
             user_owing=transaction.user_owing,
             amount=transaction.amount,
-            notes=transaction.notes
+            notes=transaction.notes,
+            expense_id=transaction.expense_id,
+            access_token=access_token
         )
         return TransactionResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)
-async def get_transaction_endpoint(transaction_id: int = Path(..., description="Transaction ID")):
+async def get_transaction_endpoint(transaction_id: str = Path(..., description="Transaction ID")):
     """Get a transaction by ID"""
     result = get_transaction_by_id(transaction_id)
     if not result:
@@ -136,7 +141,7 @@ async def update_transaction_endpoint(
         raise HTTPException(status_code=404, detail="Transaction not found or update failed")
     
     # Return updated transaction
-    result = get_transaction_by_id(int(transaction_id))
+    result = get_transaction_by_id(transaction_id)
     if not result:
         raise HTTPException(status_code=404, detail="Transaction not found after update")
     
