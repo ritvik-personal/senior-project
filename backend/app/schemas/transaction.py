@@ -7,6 +7,7 @@ class TransactionBase(BaseModel):
     user_owing: str
     amount: float
     notes: Optional[str] = None
+    expense_id: Optional[str] = None
 
 class TransactionCreate(TransactionBase):
     pass
@@ -16,11 +17,12 @@ class TransactionUpdate(BaseModel):
     user_owing: Optional[str] = None
     amount: Optional[float] = None
     notes: Optional[str] = None
+    expense_id: Optional[str] = None
 
 class TransactionResponse(TransactionBase):
-    transaction_id: int
+    transaction_id: str  # Changed from int to str since database uses UUID
     created_at: str
-    updated_at: str
+    updated_at: Optional[str] = None  # Made optional since it might be None
 
     class Config:
         from_attributes = True

@@ -13,7 +13,10 @@ TABLE_NAME = "transactions"
 def _table():
     return get_supabase_client().table(TABLE_NAME)
 
-def create_transaction(group_id: str, user_owed: str, user_owing: str, amount: float, notes: Optional[str] = None) -> Dict[str, Any]:
+def _authenticated_table(access_token: str):
+    return get_authenticated_client(access_token).table(TABLE_NAME)
+
+def create_transaction(group_id: str, user_owed: str, user_owing: str, amount: float, notes: Optional[str] = None, expense_id: Optional[str] = None, access_token: Optional[str] = None) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "group_id": group_id,
         "user_owed": user_owed,
@@ -22,14 +25,22 @@ def create_transaction(group_id: str, user_owed: str, user_owing: str, amount: f
     }
     if notes is not None:
         payload["notes"] = notes
+    if expense_id is not None:
+        payload["expense_id"] = expense_id
 
     logger.debug("Inserting transaction payload=%s", payload)
-    resp = _table().insert(payload).execute()
+    
+    # Use authenticated client if token is provided
+    if access_token:
+        resp = _authenticated_table(access_token).insert(payload).execute()
+    else:
+        resp = _table().insert(payload).execute()
+    
     if resp.data:
         return resp.data[0]
     raise RuntimeError(f"Failed to insert transaction: {resp}")
 
-def get_transaction_by_id(transaction_id: int) -> Optional[Dict[str, Any]]:
+def get_transaction_by_id(transaction_id: str) -> Optional[Dict[str, Any]]:
     query = _table().select("*").eq("transaction_id", transaction_id)
     resp = query.single().execute()
     return resp.data
@@ -54,9 +65,22 @@ def get_transactions_by_user_owing(user_owing: str) -> List[Dict[str, Any]]:
     resp = query.execute()
     return resp.data
 
+def get_transactions_by_expense_id(expense_id: str) -> List[Dict[str, Any]]:
+    query = _table().select("*").eq("expense_id", expense_id)
+    resp = query.execute()
+    return resp.data or []
+
 def delete_transaction(transaction_id: str) -> bool:
     resp = _table().delete().eq("transaction_id", transaction_id).execute()
     return resp.data
+
+def delete_transactions_by_expense_id(expense_id: str, access_token: Optional[str] = None) -> bool:
+    """Delete all transactions associated with an expense_id"""
+    if access_token:
+        resp = _authenticated_table(access_token).delete().eq("expense_id", expense_id).execute()
+    else:
+        resp = _table().delete().eq("expense_id", expense_id).execute()
+    return resp.data is not None
 
 def update_transaction(transaction_id: str, user_owed: str, user_owing: str, amount: float, notes: Optional[str] = None) -> bool:
     update_data = {"user_owed": user_owed, "user_owing": user_owing, "amount": amount}
@@ -64,6 +88,23 @@ def update_transaction(transaction_id: str, user_owed: str, user_owing: str, amo
         update_data["notes"] = notes
     resp = _table().update(update_data).eq("transaction_id", transaction_id).execute()
     return resp.data
+
+def update_transactions_by_expense_id(expense_id: str, amount: Optional[float] = None, notes: Optional[str] = None, access_token: Optional[str] = None) -> bool:
+    """Update all transactions associated with an expense_id"""
+    update_data = {}
+    if amount is not None:
+        update_data["amount"] = amount
+    if notes is not None:
+        update_data["notes"] = notes
+    
+    if not update_data:
+        return False
+    
+    if access_token:
+        resp = _authenticated_table(access_token).update(update_data).eq("expense_id", expense_id).execute()
+    else:
+        resp = _table().update(update_data).eq("expense_id", expense_id).execute()
+    return resp.data is not None
 
 def get_transactions_by_group_id_and_user_id(group_id: str, user_id: str) -> List[Dict[str, Any]]: 
     query = _table().select("*").eq("group_id", group_id).eq("user_id", user_id)
