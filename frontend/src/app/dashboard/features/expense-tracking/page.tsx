@@ -43,11 +43,6 @@ interface MemberInfo {
   email?: string;
 }
 
-interface BalanceInfo {
-  user_id: string;
-  email: string;
-  balance: number; // Positive = owes you, Negative = you owe
-}
 
 export default function ExpenseTrackingPage({ initialShowAddForm = false }: { initialShowAddForm?: boolean }) {
   const [expenses, setExpenses] = useState<Expense[]>(() => {
@@ -84,9 +79,6 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
 
   // 2. ADDED state to store the current user's ID
   const [userId, setUserId] = useState<string | null>(null);
-  
-  // State to store balance information for each group expense
-  const [groupBalances, setGroupBalances] = useState<Record<string, BalanceInfo[]>>({});
 
   const categories: Category[] = [
     { id: "Food", name: "Food", icon: "🍽️", color: "bg-orange-100 text-orange-800" },
@@ -118,7 +110,7 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
     }
   }, [initialShowAddForm]);
 
-  // Load user's groups from backend when expense type switches to group
+  // Load user's groups from backend on initial load and when expense type switches to group
   useEffect(() => {
     const loadUserGroups = async () => {
       try {
@@ -140,9 +132,8 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
       }
     };
 
-    if (expenseType === "group") {
-      loadUserGroups();
-    }
+    // Always load groups on mount, and also when expense type switches to group
+    loadUserGroups();
   }, [expenseType]);
 
   // Load members for the selected group to populate participants dropdown
@@ -228,86 +219,6 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
     loadExpenses();
   }, []);
 
-  // Load balances for group expenses
-  useEffect(() => {
-    const loadGroupBalances = async () => {
-      if (!userId) return;
-      
-      const groupExpenses = expenses.filter(e => e.type === "group" && e.groupId);
-      const groupIds = [...new Set(groupExpenses.map(e => e.groupId).filter(Boolean))];
-      
-      const balances: Record<string, BalanceInfo[]> = {};
-      
-      for (const groupId of groupIds) {
-        if (!groupId) continue;
-        
-        try {
-          const token = api.getToken();
-          if (!token) continue;
-          
-          // Fetch transactions for this group
-          const response = await api.get(`transactions/group/${groupId}`);
-          const data = await response.json();
-          const transactions = data.transactions || [];
-          
-          // Calculate balances for each user in the group
-          const userBalances: Record<string, number> = {};
-          const userEmails: Record<string, string> = {};
-          
-          // Get all unique user IDs from transactions
-          const allUserIds = new Set<string>();
-          transactions.forEach((tx: any) => {
-            if (tx.user_owed) allUserIds.add(tx.user_owed);
-            if (tx.user_owing) allUserIds.add(tx.user_owing);
-          });
-          
-          // Fetch emails for all users in the group
-          try {
-            const membersResponse = await api.get(`groups/${groupId}/members`);
-            const members = await membersResponse.json();
-            members.forEach((member: any) => {
-              if (member.user_id && member.email) {
-                userEmails[member.user_id] = member.email;
-              }
-            });
-          } catch (e) {
-            console.error(`Failed to fetch emails for group ${groupId}:`, e);
-          }
-          
-          // Calculate balance: (amount where current_user is user_owed) - (amount where current_user is user_owing)
-          transactions.forEach((tx: any) => {
-            const amount = parseFloat(tx.amount) || 0;
-            
-            if (tx.user_owed === userId && tx.user_owing) {
-              // Someone owes the current user
-              userBalances[tx.user_owing] = (userBalances[tx.user_owing] || 0) + amount;
-            } else if (tx.user_owing === userId && tx.user_owed) {
-              // Current user owes someone
-              userBalances[tx.user_owed] = (userBalances[tx.user_owed] || 0) - amount;
-            }
-          });
-          
-          // Convert to BalanceInfo array
-          balances[groupId] = Object.entries(userBalances)
-            .filter(([_, balance]) => Math.abs(balance) > 0.01) // Only show non-zero balances
-            .map(([user_id, balance]) => ({
-              user_id,
-              email: userEmails[user_id] || user_id,
-              balance: balance,
-            }))
-            .sort((a, b) => a.balance - b.balance); // Sort: you owe first (negative), then owes you (positive)
-        } catch (error) {
-          console.error(`Error loading balances for group ${groupId}:`, error);
-        }
-      }
-      
-      setGroupBalances(balances);
-    };
-    
-    if (expenses.length > 0 && userId) {
-      loadGroupBalances();
-    }
-  }, [expenses, userId]);
 
   useEffect(() => {
     localStorage.setItem("expenses", JSON.stringify(expenses));
@@ -868,36 +779,12 @@ return (
                       {category?.name} • {expense.date} • {expense.type}
                     </p>
                     {expense.type === "group" && expense.groupId && (
-                      <div className="mt-1">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Group: {groups.find((g) => g.id === expense.groupId)?.name || "Unknown"}
-                          {expense.participants?.length
-                            ? ` • Participants: ${expense.participants.join(", ")}`
-                            : ""}
-                        </p>
-                        {/* Who owes Who section */}
-                        {groupBalances[expense.groupId] && groupBalances[expense.groupId].length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Who owes Who:</p>
-                            {groupBalances[expense.groupId].map((balance) => (
-                              <div
-                                key={balance.user_id}
-                                className={`text-xs ${
-                                  balance.balance > 0
-                                    ? "text-green-600 dark:text-green-400"
-                                    : "text-red-600 dark:text-red-400"
-                                }`}
-                              >
-                                {balance.balance > 0 ? (
-                                  <span>{balance.email} owes you ${Math.abs(balance.balance).toFixed(2)}</span>
-                                ) : (
-                                  <span>You owe {balance.email} ${Math.abs(balance.balance).toFixed(2)}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Group: {groups.find((g) => g.id === expense.groupId)?.name || "Unknown"}
+                        {expense.participants?.length
+                          ? ` • Participants: ${expense.participants.join(", ")}`
+                          : ""}
+                      </p>
                     )}
                   </div>
                 </div>

@@ -86,6 +86,7 @@ export default function GroupSettlingPage() {
   const [memberInfos, setMemberInfos] = useState<Record<string, string>>({});
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
+  const [settleDialogGroups, setSettleDialogGroups] = useState<Array<{ group_id: string; group_name: string }>>([]);
   const [whoOwesWho, setWhoOwesWho] = useState<Array<{ user_id: string; name: string; net_amount: number }>>([]);
 
   // Helper function to get user display name
@@ -227,17 +228,48 @@ export default function GroupSettlingPage() {
     setTransactions([]);
   };
 
-  // Load members for current group for Settle Up dialog
+  // Load groups for Settle Up dialog when it opens
+  useEffect(() => {
+    const loadSettleDialogGroups = async () => {
+      if (!isSettleDialogOpen) return;
+      
+      try {
+        const token = api.getToken();
+        if (!token) return;
+        
+        const resp = await api.get("groups/my-groups");
+        const data = await resp.json();
+        const groups = (data.groups || []).map((g: any) => ({
+          group_id: g.group_id,
+          group_name: g.group_name,
+        }));
+        setSettleDialogGroups(groups);
+      } catch (e) {
+        console.error("Failed to load groups for settle dialog:", e);
+        setSettleDialogGroups([]);
+      }
+    };
+
+    loadSettleDialogGroups();
+  }, [isSettleDialogOpen]);
+
+  // Load members for selected group in Settle Up dialog (excluding current user)
   useEffect(() => {
     const loadMembers = async () => {
+      if (!isSettleDialogOpen || !settleGroupId || !userId) {
+        setGroupMembers([]);
+        setMemberInfos({});
+        return;
+      }
+      
       try {
-        const gid = selectedGroup?.group_id || null;
-        if (!gid) return;
-        const resp = await api.get(`groups/${gid}/members?exclude_self=false`);
+        const resp = await api.get(`groups/${settleGroupId}/members?exclude_self=true`);
         const data = await resp.json();
-        const ids = (data || []).map((m: any) => m.user_id);
+        // Filter out current user
+        const filteredData = (data || []).filter((m: any) => m.user_id !== userId);
+        const ids = filteredData.map((m: any) => m.user_id);
         const emails: Record<string, string> = {};
-        (data || []).forEach((m: any) => {
+        filteredData.forEach((m: any) => {
           if (m.email) emails[m.user_id] = m.email;
         });
         setGroupMembers(ids);
@@ -245,11 +277,12 @@ export default function GroupSettlingPage() {
       } catch (e) {
         console.error("Failed to load group members:", e);
         setGroupMembers([]);
+        setMemberInfos({});
       }
     };
 
     loadMembers();
-  }, [selectedGroup]);
+  }, [settleGroupId, isSettleDialogOpen, userId]);
 
   const handleToggleParticipant = (memberId: string) => {
     setSelectedParticipants((prev) =>
@@ -616,11 +649,14 @@ export default function GroupSettlingPage() {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Group</label>
                       <select
                         value={settleGroupId || ''}
-                        onChange={(e) => setSettleGroupId(e.target.value || null)}
+                        onChange={(e) => {
+                          setSettleGroupId(e.target.value || null);
+                          setSelectedParticipants([]); // Reset participants when group changes
+                        }}
                         className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2"
                       >
                         <option value="">Select group</option>
-                        {groupSettlements.map((g) => (
+                        {settleDialogGroups.map((g) => (
                           <option key={g.group_id} value={g.group_id}>{g.group_name}</option>
                         ))}
                       </select>
@@ -687,10 +723,47 @@ export default function GroupSettlingPage() {
                       </button>
                       <button
                         type="button"
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                        onClick={() => {
-                          // Placeholder: implement settlement action later
-                          setIsSettleDialogOpen(false);
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!settleGroupId || selectedParticipants.length === 0 || !settleAmount || parseFloat(settleAmount) <= 0}
+                        onClick={async () => {
+                          if (!settleGroupId || selectedParticipants.length === 0 || !settleAmount || !userId) {
+                            return;
+                          }
+                          
+                          try {
+                            const amount = parseFloat(settleAmount);
+                            if (amount <= 0) {
+                              alert("Please enter a valid amount greater than 0");
+                              return;
+                            }
+                            
+                            // Create transaction for each selected participant
+                            // user_owed = current user (they're receiving payment)
+                            // user_owing = selected participant (they're paying)
+                            for (const participantId of selectedParticipants) {
+                              const transactionData = {
+                                group_id: settleGroupId,
+                                user_owed: userId,
+                                user_owing: participantId,
+                                amount: amount,
+                                notes: "settlement"
+                              };
+                              
+                              await api.post("transactions/", transactionData);
+                            }
+                            
+                            // Reset form and close dialog
+                            setSettleGroupId(null);
+                            setSelectedParticipants([]);
+                            setSettleAmount("");
+                            setIsSettleDialogOpen(false);
+                            
+                            // Refresh transactions to show updated balances
+                            fetchTransactions();
+                          } catch (error) {
+                            console.error("Error creating settlement transaction:", error);
+                            alert("Failed to create settlement. Please try again.");
+                          }
                         }}
                       >
                         Confirm
