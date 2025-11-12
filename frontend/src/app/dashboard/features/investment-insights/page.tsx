@@ -20,7 +20,8 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import api from "@/utils/api";
 
 interface StockData {
   symbol: string;
@@ -47,22 +48,11 @@ interface AIInsights {
   recommendation: 'buy' | 'hold' | 'sell' | 'research';
 }
 
-interface Portfolio {
-  id: string;
-  name: string;
-  stocks: PortfolioStock[];
-  totalValue: number;
-  totalGainLoss: number;
-  totalGainLossPercent: number;
-}
 
-interface PortfolioStock {
-  symbol: string;
-  shares: number;
-  purchasePrice: number;
-  currentPrice: number;
-  gainLoss: number;
-  gainLossPercent: number;
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
 }
 
 export default function InvestmentInsightsPage() {
@@ -70,9 +60,13 @@ export default function InvestmentInsightsPage() {
   const [currentStock, setCurrentStock] = useState<StockData | null>(null);
   const [aiInsights, setAiInsights] = useState<AIInsights | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-  const [showCreatePortfolio, setShowCreatePortfolio] = useState(false);
-  const [activeTab, setActiveTab] = useState<'research' | 'portfolio' | 'learn'>('research');
+  const [activeTab, setActiveTab] = useState<'research' | 'learn'>('research');
+  
+  // Chat state for Learn tab
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Sample stock data (in real app, this would come from financial APIs)
   const sampleStocks: StockData[] = [
@@ -144,37 +138,6 @@ export default function InvestmentInsightsPage() {
     recommendation: 'research'
   };
 
-  useEffect(() => {
-    // Load sample portfolios
-    const samplePortfolios: Portfolio[] = [
-      {
-        id: '1',
-        name: 'Tech Growth Portfolio',
-        totalValue: 2500,
-        totalGainLoss: 125.50,
-        totalGainLossPercent: 5.28,
-        stocks: [
-          {
-            symbol: 'AAPL',
-            shares: 5,
-            purchasePrice: 150.00,
-            currentPrice: 175.43,
-            gainLoss: 127.15,
-            gainLossPercent: 16.95
-          },
-          {
-            symbol: 'MSFT',
-            shares: 3,
-            purchasePrice: 350.00,
-            currentPrice: 378.85,
-            gainLoss: 86.55,
-            gainLossPercent: 8.25
-          }
-        ]
-      }
-    ];
-    setPortfolios(samplePortfolios);
-  }, []);
 
   const handleSearchStock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,6 +182,52 @@ export default function InvestmentInsightsPage() {
     return `$${marketCap}`;
   };
 
+  // Scroll to bottom of chat when new messages arrive
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isChatLoading) return;
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: chatInput.trim(),
+      timestamp: new Date()
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    try {
+      const response = await api.post('financial-literacy/chat', {
+        query: userMessage.content
+      });
+
+      const data = await response.json();
+      
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: data.answer,
+        timestamp: new Date()
+      };
+
+      setChatMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error processing your question. Please try again.',
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -226,14 +235,6 @@ export default function InvestmentInsightsPage() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Investment Insights</h2>
           <p className="text-gray-600 dark:text-gray-300">AI-powered stock research with student-friendly analysis</p>
-        </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={() => setShowCreatePortfolio(true)}
-            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            📊 Create Portfolio
-          </button>
         </div>
       </div>
 
@@ -248,16 +249,6 @@ export default function InvestmentInsightsPage() {
           }`}
         >
           🔍 Research Stocks
-        </button>
-        <button
-          onClick={() => setActiveTab('portfolio')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'portfolio'
-              ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
-              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-          }`}
-        >
-          📈 Portfolio
         </button>
         <button
           onClick={() => setActiveTab('learn')}
@@ -409,172 +400,91 @@ export default function InvestmentInsightsPage() {
         </div>
       )}
 
-      {/* Portfolio Tab */}
-      {activeTab === 'portfolio' && (
-        <div className="space-y-6">
-          {portfolios.map(portfolio => (
-            <div key={portfolio.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{portfolio.name}</h3>
-                  <p className="text-gray-600 dark:text-gray-300">Virtual Portfolio</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    ${portfolio.totalValue.toFixed(2)}
-                  </div>
-                  <div className={`text-lg ${portfolio.totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {portfolio.totalGainLoss >= 0 ? '+' : ''}${portfolio.totalGainLoss.toFixed(2)} ({portfolio.totalGainLossPercent >= 0 ? '+' : ''}{portfolio.totalGainLossPercent.toFixed(2)}%)
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {portfolio.stocks.map(stock => (
-                  <div key={stock.symbol} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">{stock.symbol}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-300">
-                          {stock.shares} shares @ ${stock.purchasePrice.toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        ${(stock.shares * stock.currentPrice).toFixed(2)}
-                      </div>
-                      <div className={`text-sm ${stock.gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {stock.gainLoss >= 0 ? '+' : ''}${stock.gainLoss.toFixed(2)} ({stock.gainLossPercent >= 0 ? '+' : ''}{stock.gainLossPercent.toFixed(2)}%)
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {portfolios.length === 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-12 text-center">
-              <span className="text-6xl mb-4 block">📈</span>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Portfolios Yet</h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
-                Create a virtual portfolio to practice investing and track your learning
-              </p>
-              <button
-                onClick={() => setShowCreatePortfolio(true)}
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                Create Your First Portfolio
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Learn Tab */}
       {activeTab === 'learn' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Investment Basics for Students</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="border-l-4 border-blue-500 pl-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">What is a Stock?</h4>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    A stock represents ownership in a company. When you buy a stock, you become a shareholder.
-                  </p>
-                </div>
-                
-                <div className="border-l-4 border-green-500 pl-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">P/E Ratio</h4>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    Price-to-Earnings ratio compares a company's stock price to its earnings per share. 
-                    Lower ratios may indicate undervaluation.
-                  </p>
-                </div>
-                
-                <div className="border-l-4 border-purple-500 pl-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Market Cap</h4>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    Market capitalization is the total value of all company shares. 
-                    Large-cap stocks are generally more stable.
-                  </p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="border-l-4 border-yellow-500 pl-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Dividend Yield</h4>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    The percentage of a company's stock price paid out as dividends annually. 
-                    Higher yields can provide steady income.
-                  </p>
-                </div>
-                
-                <div className="border-l-4 border-red-500 pl-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Risk Management</h4>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    Never invest more than you can afford to lose. Diversify your portfolio 
-                    across different sectors and companies.
-                  </p>
-                </div>
-                
-                <div className="border-l-4 border-indigo-500 pl-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white">Long-term Thinking</h4>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    Successful investing is about patience and long-term growth. 
-                    Don't try to time the market.
-                  </p>
-                </div>
-              </div>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col h-[600px]">
+            <div className="mb-4">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Financial Literacy Chat
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Ask me anything about financial terms, definitions, and concepts!
+              </p>
             </div>
-          </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Student Investment Tips</h3>
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3">
-                <span className="text-green-500 mt-1">💡</span>
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-white">Start Small</div>
-                  <div className="text-gray-600 dark:text-gray-300 text-sm">
-                    Begin with small amounts you can afford to lose while learning.
-                  </div>
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2">
+              {chatMessages.length === 0 && (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <span className="text-4xl mb-2 block">💬</span>
+                  <p>Start a conversation! Ask me about financial literacy terms and concepts.</p>
+                  <p className="text-sm mt-2">Try: "What is compound interest?" or "Explain diversification"</p>
                 </div>
-              </div>
+              )}
               
-              <div className="flex items-start space-x-3">
-                <span className="text-blue-500 mt-1">📚</span>
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-white">Educate Yourself</div>
-                  <div className="text-gray-600 dark:text-gray-300 text-sm">
-                    Read books, follow financial news, and use educational resources.
+              {chatMessages.map((message, idx) => (
+                <div
+                  key={idx}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                      message.role === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                    }`}
+                  >
+                    <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                    <div
+                      className={`text-xs mt-1 ${
+                        message.role === 'user'
+                          ? 'text-blue-100'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }`}
+                    >
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
               
-              <div className="flex items-start space-x-3">
-                <span className="text-purple-500 mt-1">🎯</span>
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-white">Set Goals</div>
-                  <div className="text-gray-600 dark:text-gray-300 text-sm">
-                    Define your investment goals - retirement, house, education, etc.
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               
-              <div className="flex items-start space-x-3">
-                <span className="text-yellow-500 mt-1">⏰</span>
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-white">Time is Your Friend</div>
-                  <div className="text-gray-600 dark:text-gray-300 text-sm">
-                    The earlier you start investing, the more time compound interest has to work.
-                  </div>
-                </div>
-              </div>
+              <div ref={chatEndRef} />
             </div>
+
+            {/* Chat Input */}
+            <form onSubmit={handleChatSubmit} className="flex space-x-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask about financial terms and concepts..."
+                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                disabled={isChatLoading}
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim() || isChatLoading}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isChatLoading ? 'Sending...' : 'Send'}
+              </button>
+            </form>
           </div>
         </div>
       )}
