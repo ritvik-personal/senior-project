@@ -11,3 +11,4 @@ class FinancialLiteracyResponse(BaseModel):
     answer: str
     sources: Optional[list[str]] = None
 
+
