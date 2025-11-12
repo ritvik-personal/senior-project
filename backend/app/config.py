@@ -9,6 +9,9 @@ class Settings:
     # Prefer ANON key, but also allow SUPABASE_KEY env var as fallback
     SUPABASE_PUBLIC_KEY: str = os.getenv("SUPABASE_PUBLIC_KEY", "")
     
+    # OpenAI Configuration
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    
     # JWT Configuration
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
     ALGORITHM: str = "HS256"
