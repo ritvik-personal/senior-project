@@ -26,17 +26,24 @@ import api from "@/utils/api";
 interface StockData {
   symbol: string;
   name: string;
-  price: number;
+  current_price: number;
+  previous_close: number;
   change: number;
-  changePercent: number;
-  marketCap: number;
-  peRatio: number;
-  dividendYield: number;
-  volume: number;
-  high52Week: number;
-  low52Week: number;
-  sector: string;
-  industry: string;
+  change_percent: number;
+  market_cap: number | null;
+  volume: number | null;
+  avg_volume: number | null;
+  pe_ratio: number | null;
+  dividend_yield: number | null;
+  high_52_week: number | null;
+  low_52_week: number | null;
+  high_today: number | null;
+  low_today: number | null;
+  open_price: number | null;
+  sector: string | null;
+  industry: string | null;
+  currency: string | null;
+  exchange: string | null;
 }
 
 interface AIInsights {
@@ -60,6 +67,7 @@ export default function InvestmentInsightsPage() {
   const [currentStock, setCurrentStock] = useState<StockData | null>(null);
   const [aiInsights, setAiInsights] = useState<AIInsights | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'research' | 'learn'>('research');
   
   // Chat state for Learn tab
@@ -67,55 +75,6 @@ export default function InvestmentInsightsPage() {
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Sample stock data (in real app, this would come from financial APIs)
-  const sampleStocks: StockData[] = [
-    {
-      symbol: 'AAPL',
-      name: 'Apple Inc.',
-      price: 175.43,
-      change: 2.15,
-      changePercent: 1.24,
-      marketCap: 2800000000000,
-      peRatio: 28.5,
-      dividendYield: 0.5,
-      volume: 45000000,
-      high52Week: 198.23,
-      low52Week: 124.17,
-      sector: 'Technology',
-      industry: 'Consumer Electronics'
-    },
-    {
-      symbol: 'MSFT',
-      name: 'Microsoft Corporation',
-      price: 378.85,
-      change: -1.25,
-      changePercent: -0.33,
-      marketCap: 2800000000000,
-      peRatio: 32.1,
-      dividendYield: 0.7,
-      volume: 25000000,
-      high52Week: 384.30,
-      low52Week: 309.45,
-      sector: 'Technology',
-      industry: 'Software'
-    },
-    {
-      symbol: 'GOOGL',
-      name: 'Alphabet Inc.',
-      price: 142.56,
-      change: 3.42,
-      changePercent: 2.46,
-      marketCap: 1800000000000,
-      peRatio: 25.8,
-      dividendYield: 0,
-      volume: 30000000,
-      high52Week: 151.55,
-      low52Week: 115.55,
-      sector: 'Technology',
-      industry: 'Internet'
-    }
-  ];
 
   // Sample AI insights (in real app, this would come from NVIDIA NIM LLM)
   const sampleInsights: AIInsights = {
@@ -144,16 +103,58 @@ export default function InvestmentInsightsPage() {
     if (!searchSymbol) return;
 
     setIsLoading(true);
+    setError(null);
+    setCurrentStock(null);
+    setAiInsights(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      const stock = sampleStocks.find(s => s.symbol.toUpperCase() === searchSymbol.toUpperCase());
-      if (stock) {
-        setCurrentStock(stock);
-        setAiInsights(sampleInsights);
+    try {
+      // Make the API call directly to handle error responses properly
+      const token = api.getToken();
+      const url = api.getUrl(`stocks/lookup?symbol=${encodeURIComponent(searchSymbol)}`);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      
+      if (!response.ok) {
+        // Try to parse error message from response
+        let errorMessage = `Stock ticker '${searchSymbol}' cannot be found. Please make sure to enter a correct stock ticker.`;
+        
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch {
+          // If we can't parse JSON, use default message for 404
+          if (response.status === 404) {
+            errorMessage = `Stock ticker '${searchSymbol}' cannot be found. Please make sure to enter a correct stock ticker.`;
+          } else {
+            errorMessage = 'Failed to fetch stock data. Please check the symbol and try again.';
+          }
+        }
+        
+        setError(errorMessage);
+        return;
       }
+      
+      const data = await response.json();
+      setCurrentStock(data);
+      // Keep AI insights for now (can be enhanced later)
+      setAiInsights(sampleInsights);
+    } catch (err: any) {
+      console.error('Error fetching stock data:', err);
+      // Network errors or other exceptions
+      if (err.message?.includes('404') || err.message?.includes('not found') || err.message?.includes('cannot be found')) {
+        setError(`Stock ticker '${searchSymbol}' cannot be found. Please make sure to enter a correct stock ticker.`);
+      } else {
+        setError('Failed to fetch stock data. Please check your connection and try again.');
+      }
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const getRiskColor = (risk: string) => {
@@ -286,52 +287,146 @@ export default function InvestmentInsightsPage() {
             </form>
           </div>
 
-          {/* Stock Data */}
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-red-600 dark:text-red-400">⚠️</span>
+                <p className="text-red-800 dark:text-red-200">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Stock Data Table */}
           {currentStock && (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{currentStock.name}</h3>
-                  <p className="text-gray-600 dark:text-gray-300">{currentStock.symbol} • {currentStock.sector}</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">${currentStock.price.toFixed(2)}</div>
-                  <div className={`text-lg ${currentStock.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {currentStock.change >= 0 ? '+' : ''}{currentStock.change.toFixed(2)} ({currentStock.changePercent >= 0 ? '+' : ''}{currentStock.changePercent.toFixed(2)}%)
+              <div className="mb-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{currentStock.name}</h3>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      {currentStock.symbol}
+                      {currentStock.exchange && ` • ${currentStock.exchange}`}
+                      {currentStock.sector && ` • ${currentStock.sector}`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                      ${currentStock.current_price.toFixed(2)}
+                    </div>
+                    <div className={`text-lg font-semibold ${currentStock.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {currentStock.change >= 0 ? '+' : ''}{currentStock.change.toFixed(2)} ({currentStock.change_percent >= 0 ? '+' : ''}{currentStock.change_percent.toFixed(2)}%)
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Market Cap</div>
-                  <div className="font-bold text-gray-900 dark:text-white">{formatMarketCap(currentStock.marketCap)}</div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 dark:text-gray-300">P/E Ratio</div>
-                  <div className="font-bold text-gray-900 dark:text-white">{currentStock.peRatio}</div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Dividend Yield</div>
-                  <div className="font-bold text-gray-900 dark:text-white">{currentStock.dividendYield}%</div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Volume</div>
-                  <div className="font-bold text-gray-900 dark:text-white">{currentStock.volume.toLocaleString()}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">52-Week Range</div>
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    ${currentStock.low52Week.toFixed(2)} - ${currentStock.high52Week.toFixed(2)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300 mb-2">Industry</div>
-                  <div className="font-medium text-gray-900 dark:text-white">{currentStock.industry}</div>
-                </div>
+              {/* Stock Information Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">Metric</th>
+                      <th className="text-right py-3 px-4 font-semibold text-gray-900 dark:text-white">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tr>
+                      <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Previous Close</td>
+                      <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                        ${currentStock.previous_close.toFixed(2)}
+                      </td>
+                    </tr>
+                    {currentStock.open_price && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Open</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          ${currentStock.open_price.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.high_today && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Day High</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          ${currentStock.high_today.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.low_today && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Day Low</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          ${currentStock.low_today.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.high_52_week && currentStock.low_52_week && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">52-Week Range</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          ${currentStock.low_52_week.toFixed(2)} - ${currentStock.high_52_week.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.market_cap && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Market Cap</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          {formatMarketCap(currentStock.market_cap)}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.volume && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Volume</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          {currentStock.volume.toLocaleString()}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.avg_volume && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Avg Volume</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          {currentStock.avg_volume.toLocaleString()}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.pe_ratio && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">P/E Ratio</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          {currentStock.pe_ratio.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.dividend_yield !== null && currentStock.dividend_yield !== undefined && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Dividend Yield</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          {currentStock.dividend_yield.toFixed(2)}%
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.sector && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Sector</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          {currentStock.sector}
+                        </td>
+                      </tr>
+                    )}
+                    {currentStock.industry && (
+                      <tr>
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Industry</td>
+                        <td className="py-3 px-4 text-right font-medium text-gray-900 dark:text-white">
+                          {currentStock.industry}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

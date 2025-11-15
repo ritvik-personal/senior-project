@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import health, users, auth, expenses, group_information, groups, shared_wishlist, credit_cards, transactions, financial_literacy
+from app.api import health, users, auth, expenses, group_information, groups, shared_wishlist, credit_cards, transactions, financial_literacy, stocks
 from app.config import settings
 from app.database import test_connection
 import uvicorn
@@ -43,6 +43,7 @@ app.include_router(shared_wishlist.router, prefix="/api/shared-wishlist", tags=[
 app.include_router(credit_cards.router, prefix="/api/credit-cards", tags=["credit_cards"])
 app.include_router(transactions.router, prefix="/api/transactions", tags=["transactions"])
 app.include_router(financial_literacy.router, prefix="/api/financial-literacy", tags=["financial_literacy"])
+app.include_router(stocks.router, prefix="/api/stocks", tags=["stocks"])
 
 @app.on_event("startup")
 async def startup_event():
@@ -67,7 +68,8 @@ async def root():
         "shared_wishlist": "/api/shared-wishlist",
         "credit_cards": "/api/credit-cards",
         "transactions": "/api/transactions",
-        "financial_literacy": "/api/financial-literacy"
+        "financial_literacy": "/api/financial-literacy",
+        "stocks": "/api/stocks"
     }
 
 if __name__ == "__main__":
