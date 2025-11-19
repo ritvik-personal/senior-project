@@ -156,9 +156,10 @@ async def chat_financial_literacy(query: FinancialLiteracyQuery):
                         if content:
                             # Include doc_title as context if available
                             if doc_title:
-                                context_chunks.append(f"[From: {doc_title}]\n{content}")
+                                chunk_text = f"[From: {doc_title}]\n{content}"
                             else:
-                                context_chunks.append(content)
+                                chunk_text = content
+                            context_chunks.append(chunk_text)
                 
                 context = "\n\n".join(context_chunks) if context_chunks else ""
                 
@@ -198,18 +199,25 @@ async def chat_financial_literacy(query: FinancialLiteracyQuery):
                 logger.warning(f"Could not retrieve fallback chunks: {e}")
                 context = ""
         
-        # Prepare the prompt for NVIDIA NIM
-        system_prompt = """You are a helpful financial literacy tutor for students. 
-        Answer questions about financial terms and concepts in a clear, educational, and student-friendly manner.
-        Use the provided context from the knowledge base when relevant, but also use your general knowledge.
-        Keep explanations simple and practical, with examples when helpful."""
+        # Prepare the prompt for NVIDIA NIM using COSTAR format
+        system_prompt = """You are a financial literacy tutor answering college students' questions about personal finance concepts, terms, and practices."""
         
-        user_prompt = f"""Context from knowledge base:
+        user_prompt = f"""Context: You have access to a curated financial literacy knowledge base. Use the provided context when relevant, supplementing with your knowledge when needed.
+
+Objective: Answer the student's financial literacy question accurately and helpfully.
+
+Style: Simple, practical explanations with concrete real-life examples. Avoid jargon; define terms if used.
+
+Tone: Friendly, encouraging, and educational.
+
+Audience: Students learning personal finance who may be new to financial concepts.
+
+Response Format: Provide a direct, concise answer in plain text paragraphs. Do not include any references to the sources like "[source name]'s worksheet can be used to help you learn more".
+
+Knowledge Base Context:
 {context}
 
-Student Question: {query.query}
-
-Please provide a clear, educational answer to the student's question about financial literacy."""
+Student Question: {query.query}"""
         
         # Call NVIDIA NIM for chat completion
         messages = [
