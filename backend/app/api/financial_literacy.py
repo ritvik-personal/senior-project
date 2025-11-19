@@ -218,6 +218,7 @@ Knowledge Base Context:
 {context}
 
 Student Question: {query.query}"""
+Student Question: {query.query}"""
         
         # Call NVIDIA NIM for chat completion
         messages = [
