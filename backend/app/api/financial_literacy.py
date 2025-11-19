@@ -200,19 +200,19 @@ async def chat_financial_literacy(query: FinancialLiteracyQuery):
                 context = ""
         
         # Prepare the prompt for NVIDIA NIM using COSTAR format
-        system_prompt = """You are a financial literacy tutor answering college students' questions about personal finance concepts, terms, and practices."""
+        system_prompt = """You are a financial literacy tutor answering student questions about personal finance concepts, terms, and practices."""
         
         user_prompt = f"""Context: You have access to a curated financial literacy knowledge base. Use the provided context when relevant, supplementing with your knowledge when needed.
 
 Objective: Answer the student's financial literacy question accurately and helpfully.
 
-Style: Simple, practical explanations with concrete real-life examples. Avoid jargon; define terms if used.
+Style: Simple, practical explanations with concrete examples when applicable. Avoid jargon; define terms if used.
 
 Tone: Friendly, encouraging, and educational.
 
 Audience: Students learning personal finance who may be new to financial concepts.
 
-Response Format: Provide a direct, concise answer in plain text paragraphs. Do not include any references to the sources like "[source name]'s worksheet can be used to help you learn more".
+Response Format: Provide a direct, concise answer in plain text paragraphs.
 
 Knowledge Base Context:
 {context}
