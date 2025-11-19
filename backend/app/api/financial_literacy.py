@@ -156,9 +156,10 @@ async def chat_financial_literacy(query: FinancialLiteracyQuery):
                         if content:
                             # Include doc_title as context if available
                             if doc_title:
-                                context_chunks.append(f"[From: {doc_title}]\n{content}")
+                                chunk_text = f"[From: {doc_title}]\n{content}"
                             else:
-                                context_chunks.append(content)
+                                chunk_text = content
+                            context_chunks.append(chunk_text)
                 
                 context = "\n\n".join(context_chunks) if context_chunks else ""
                 
