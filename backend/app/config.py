@@ -17,6 +17,9 @@ class Settings:
     NIM_BASE_URL: str = os.getenv("NIM_BASE_URL", "https://integrate.api.nvidia.com/v1")
     NIM_MODEL: str = os.getenv("NIM_MODEL", "meta/llama-3.1-8b-instruct")  # Default NIM model
     
+    # News API Configuration (optional - for enhanced news fetching)
+    NEWS_API_KEY: str = os.getenv("NEWS_API_KEY", "")
+    
     # JWT Configuration
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
     ALGORITHM: str = "HS256"

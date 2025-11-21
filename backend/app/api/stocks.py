@@ -1,11 +1,21 @@
 from fastapi import APIRouter, HTTPException, Query
-from app.schemas.stock import StockQuery, StockResponse
+from app.schemas.stock import StockQuery, StockResponse, StockInsightsResponse, NewsArticle
+from app.services.news_service import fetch_stock_news
 import yfinance as yf
 import logging
+import os
+import httpx
+import json
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# NVIDIA NIM configuration (reuse from financial_literacy pattern)
+NIM_ENDPOINT = os.getenv("NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions")
+NIM_MODEL = os.getenv("NIM_MODEL", "meta/llama3-8b-instruct")
+# Support both NIM_API_KEY and NVIDIA_NIM_API_KEY for consistency
+NIM_API_KEY = os.getenv("NVIDIA_NIM_API_KEY") or os.getenv("NIM_API_KEY")
 
 @router.get("/lookup", response_model=StockResponse)
 async def lookup_stock(symbol: str = Query(..., description="Stock ticker symbol (e.g., AAPL, MSFT, GOOGL)")):
@@ -138,5 +148,312 @@ async def lookup_stock(symbol: str = Query(..., description="Stock ticker symbol
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching stock data: {str(e)}"
+        )
+
+
+async def call_nim_chat_completion(messages: list, model: str = None, max_tokens: int = 1000) -> str:
+    """
+    Call NVIDIA NIM API for chat completion.
+    
+    Args:
+        messages: List of message dictionaries with 'role' and 'content'
+        model: Model name (defaults to NIM_MODEL)
+        max_tokens: Maximum tokens in response
+    
+    Returns:
+        Generated response text
+    """
+    model = model or NIM_MODEL
+    
+    if not NIM_API_KEY:
+        raise ValueError(
+            "NVIDIA NIM API key is required but not configured. "
+            "Please set NVIDIA_NIM_API_KEY environment variable."
+        )
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {NIM_API_KEY}"
+    }
+    
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": max_tokens,
+        "stream": False
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(NIM_ENDPOINT, headers=headers, json=payload)
+            response.raise_for_status()
+            result = response.json()
+            
+            if "choices" in result and len(result["choices"]) > 0:
+                return result["choices"][0]["message"]["content"]
+            else:
+                raise ValueError("Unexpected response format from NIM API")
+    except httpx.ConnectError as e:
+        raise ConnectionError(
+            f"Failed to connect to NIM endpoint at {NIM_ENDPOINT}. "
+            f"Please ensure the NIM server is running. Error: {str(e)}"
+        )
+    except httpx.TimeoutException as e:
+        raise TimeoutError(
+            f"Request to NIM endpoint timed out after 30 seconds. "
+            f"Endpoint: {NIM_ENDPOINT}. Error: {str(e)}"
+        )
+    except httpx.HTTPStatusError as e:
+        raise ValueError(
+            f"NIM API returned error status {e.response.status_code}: {e.response.text}"
+        )
+
+
+@router.get("/insights", response_model=StockInsightsResponse)
+async def get_stock_insights(symbol: str = Query(..., description="Stock ticker symbol (e.g., AAPL, MSFT, GOOGL)")):
+    """
+    Get AI-driven stock insights combining stock data and recent news articles.
+    
+    This endpoint:
+    1. Fetches current stock data
+    2. Retrieves recent news articles about the stock
+    3. Uses NVIDIA NIM LLM to analyze and generate insights
+    4. Returns structured insights with news summaries and recommendation
+    """
+    try:
+        # Step 1: Get stock data
+        symbol = symbol.upper().strip()
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
+        
+        # Validate stock exists
+        if not info or (len(info) <= 1 and 'symbol' not in info):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Stock ticker '{symbol}' cannot be found."
+            )
+        
+        # Get quote data
+        quote_data = ticker.history(period="1d", interval="1m")
+        current_price = None
+        if not quote_data.empty:
+            current_price = float(quote_data['Close'].iloc[-1])
+        
+        if current_price is None:
+            current_price = info.get('regularMarketPrice') or info.get('currentPrice')
+            if current_price is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Stock ticker '{symbol}' cannot be found."
+                )
+        
+        current_price = float(current_price)
+        previous_close = float(info.get('previousClose', current_price))
+        change = current_price - previous_close
+        change_percent = (change / previous_close * 100) if previous_close > 0 else 0.0
+        
+        company_name = info.get('longName') or info.get('shortName') or symbol
+        
+        # Step 2: Fetch recent news articles (last 7 days only)
+        news_articles = await fetch_stock_news(symbol, company_name, max_days_old=7)
+        
+        # Step 3: Prepare stock data summary for AI
+        stock_summary = f"""
+Stock: {symbol} ({company_name})
+Current Price: ${current_price:.2f}
+Previous Close: ${previous_close:.2f}
+Change: ${change:.2f} ({change_percent:+.2f}%)
+Market Cap: {info.get('marketCap', 'N/A')}
+P/E Ratio: {info.get('trailingPE') or info.get('forwardPE') or 'N/A'}
+Dividend Yield: {info.get('dividendYield', 0) * 100 if info.get('dividendYield') else 0:.2f}%
+52-Week High: ${info.get('fiftyTwoWeekHigh', 'N/A')}
+52-Week Low: ${info.get('fiftyTwoWeekLow', 'N/A')}
+Sector: {info.get('sector', 'N/A')}
+Industry: {info.get('industry', 'N/A')}
+"""
+        
+        # Step 4: Prepare news articles summary
+        news_text = ""
+        if news_articles:
+            news_text = "\n\nRecent News Articles:\n"
+            for i, article in enumerate(news_articles[:10], 1):
+                news_text += f"\n{i}. {article.get('title', 'No title')}\n"
+                if article.get('summary'):
+                    news_text += f"   Summary: {article['summary']}\n"
+                if article.get('publisher'):
+                    news_text += f"   Source: {article['publisher']}\n"
+        else:
+            news_text = "\n\nNo recent news articles found."
+        
+        # Step 5: Call NVIDIA NIM to generate insights using COSTAR format
+        system_prompt = """You are a financial analyst providing educational stock insights for college students. 
+Your role is to analyze stock data and news to provide clear, actionable investment recommendations. 
+Always emphasize that this is educational content, not financial advice."""
+
+        user_prompt = f"""Context: You have access to current stock data and recent news articles (from the last 7 days) for {symbol} ({company_name}). Use the provided stock data and news articles to generate actionable investment insights. Only analyze the news articles provided - do not reference or mention any outdated news (like iPhone 13 from 2021). Focus only on the current, recent news provided.
+
+Objective: Analyze the stock data and recent news to provide actionable investment insights that help students make informed investment decisions. Generate a well-supported recommendation (buy/hold/sell/research) based on the analysis.
+
+Style: Clear, specific, and investment-focused. Explain what metrics mean for investment decisions, not just what they are. Use concrete examples and specific numbers from the stock data. Avoid generic statements.
+
+Tone: Professional, educational, and balanced. Be honest about risks and opportunities. Avoid being overly promotional or pessimistic.
+
+Audience: College students learning about investing who may be new to stock analysis but want actionable insights to make investment decisions.
+
+Response Format: Provide your analysis in the following JSON format. Return ONLY valid JSON, no additional text before or after:
+{{
+  "summary": "A 2-3 sentence overview of the stock's current investment situation and outlook",
+  "keyPoints": ["Actionable investment insight 1", "Actionable investment insight 2", "Actionable investment insight 3", "Actionable investment insight 4", "Actionable investment insight 5"],
+  "newsSummaries": ["Bullet summary of news article 1", "Bullet summary of news article 2", ...],
+  "recommendation": "buy|hold|sell|research",
+  "riskAssessment": "low|medium|high",
+  "studentFriendly": true,
+  "educationalNotes": ["Contextual investment insight 1", "Contextual investment insight 2", "Contextual investment insight 3"]
+}}
+
+Guidelines for each field:
+
+KEY POINTS (5 items required):
+- Focus on actionable investment insights, not just listing metrics
+- Explain what the metrics MEAN for investment decisions (e.g., "P/E ratio of 36 is 80% above market average, suggesting the stock may be overvalued unless the company can deliver strong earnings growth" instead of just "High P/E ratio")
+- Include insights about: valuation analysis, growth prospects, competitive position, financial health, market sentiment
+- Make each point specific to this stock's current situation using actual numbers from the data
+- Avoid generic statements - explain WHY it matters for investors
+
+EDUCATIONAL NOTES (3 items required):
+- Provide contextual investment insights specific to this stock, not generic definitions
+- Explain what the metrics mean FOR THIS PARTICULAR STOCK in the current market context
+- Focus on practical implications for investment decisions (e.g., "The 39% dividend yield appears unusually high - verify this isn't a data error, as sustainable yields are typically 2-6%")
+- Help students understand how to interpret these metrics for investment decisions
+- Avoid generic explanations - provide stock-specific context
+
+RECOMMENDATION (required):
+- Must be one of: "buy", "hold", "sell", or "research"
+- Should be well-supported by the key points and news analysis
+- "buy" = positive outlook, good entry point based on fundamentals and news
+- "hold" = neutral outlook, maintain position if already owned, wait for better entry if not
+- "sell" = negative outlook, consider exiting based on concerns
+- "research" = insufficient information, mixed signals, or need more data
+
+NEWS SUMMARIES (required):
+- Concise bullet points summarizing the most important news articles (one per article, max 10)
+- Focus on news that impacts investment decisions
+- Highlight positive/negative developments that affect the stock's outlook
+
+Stock Data:
+{stock_summary}
+
+Recent News Articles (Last 7 Days):
+{news_text}"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        try:
+            ai_response = await call_nim_chat_completion(messages, max_tokens=2000)
+            
+            # Parse JSON response from AI
+            # Sometimes AI adds markdown code blocks, so we need to extract JSON
+            ai_response = ai_response.strip()
+            if ai_response.startswith("```json"):
+                ai_response = ai_response[7:]
+            if ai_response.startswith("```"):
+                ai_response = ai_response[3:]
+            if ai_response.endswith("```"):
+                ai_response = ai_response[:-3]
+            ai_response = ai_response.strip()
+            
+            try:
+                insights_data = json.loads(ai_response)
+            except json.JSONDecodeError:
+                # If JSON parsing fails, try to extract JSON object from text
+                import re
+                json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+                if json_match:
+                    insights_data = json.loads(json_match.group())
+                else:
+                    raise ValueError("Could not parse JSON from AI response")
+            
+            # Validate and extract data
+            summary = insights_data.get("summary", "Analysis unavailable")
+            key_points = insights_data.get("keyPoints", [])
+            news_summaries = insights_data.get("newsSummaries", [])
+            recommendation = insights_data.get("recommendation", "research").lower()
+            risk_assessment = insights_data.get("riskAssessment", "medium").lower()
+            student_friendly = insights_data.get("studentFriendly", True)
+            educational_notes = insights_data.get("educationalNotes", [])
+            
+            # Ensure recommendation is valid
+            if recommendation not in ["buy", "hold", "sell", "research"]:
+                recommendation = "research"
+            
+            # Ensure risk assessment is valid
+            if risk_assessment not in ["low", "medium", "high"]:
+                risk_assessment = "medium"
+            
+            # Convert news articles to schema format
+            news_article_models = [
+                NewsArticle(
+                    title=article.get("title", ""),
+                    link=article.get("link", ""),
+                    publisher=article.get("publisher"),
+                    published_at=article.get("published_at"),
+                    summary=article.get("summary")
+                )
+                for article in news_articles
+            ]
+            
+            return StockInsightsResponse(
+                summary=summary,
+                keyPoints=key_points,
+                newsSummaries=news_summaries,
+                recommendation=recommendation,
+                riskAssessment=risk_assessment,
+                studentFriendly=student_friendly,
+                educationalNotes=educational_notes,
+                newsArticles=news_article_models
+            )
+            
+        except ConnectionError as e:
+            logger.error(f"NIM connection error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Cannot connect to NVIDIA NIM endpoint. Please ensure the NIM server is running."
+            )
+        except TimeoutError as e:
+            logger.error(f"NIM timeout error: {e}")
+            raise HTTPException(
+                status_code=504,
+                detail=f"Request to NVIDIA NIM timed out."
+            )
+        except ValueError as e:
+            error_msg = str(e)
+            logger.error(f"NIM API error: {e}")
+            if "API key is required" in error_msg:
+                raise HTTPException(
+                    status_code=401,
+                    detail="NVIDIA NIM API key is missing. Please set NVIDIA_NIM_API_KEY environment variable."
+                )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error generating AI insights: {error_msg}"
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error calling NIM API: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error generating AI insights: {str(e)}"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating stock insights for {symbol}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating stock insights: {str(e)}"
         )
 
