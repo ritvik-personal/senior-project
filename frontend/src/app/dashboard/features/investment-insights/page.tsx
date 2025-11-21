@@ -49,6 +49,7 @@ interface StockData {
 interface AIInsights {
   summary: string;
   keyPoints: string[];
+  newsSummaries: string[];
   riskAssessment: 'low' | 'medium' | 'high';
   studentFriendly: boolean;
   educationalNotes: string[];
@@ -76,7 +77,7 @@ export default function InvestmentInsightsPage() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Sample AI insights (in real app, this would come from NVIDIA NIM LLM)
+  // Sample AI insights (fallback if API fails)
   const sampleInsights: AIInsights = {
     summary: "Apple Inc. is a technology giant with strong fundamentals and a loyal customer base. The company has demonstrated consistent growth through its ecosystem of products and services, including iPhone, Mac, iPad, and services like Apple Music and iCloud.",
     keyPoints: [
@@ -86,6 +87,7 @@ export default function InvestmentInsightsPage() {
       "Innovation in AI and augmented reality",
       "Geographic diversification reducing risk"
     ],
+    newsSummaries: [],
     riskAssessment: 'medium',
     studentFriendly: true,
     educationalNotes: [
@@ -142,8 +144,31 @@ export default function InvestmentInsightsPage() {
       
       const data = await response.json();
       setCurrentStock(data);
-      // Keep AI insights for now (can be enhanced later)
-      setAiInsights(sampleInsights);
+      
+      // Fetch AI insights with news analysis
+      try {
+        const insightsUrl = api.getUrl(`stocks/insights?symbol=${encodeURIComponent(searchSymbol)}`);
+        const insightsResponse = await fetch(insightsUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        
+        if (insightsResponse.ok) {
+          const insightsData = await insightsResponse.json();
+          setAiInsights(insightsData);
+        } else {
+          // If insights fail, use sample data as fallback
+          console.warn('Failed to fetch AI insights, using fallback');
+          setAiInsights(sampleInsights);
+        }
+      } catch (insightsError) {
+        console.error('Error fetching AI insights:', insightsError);
+        // Use sample data as fallback
+        setAiInsights(sampleInsights);
+      }
     } catch (err: any) {
       console.error('Error fetching stock data:', err);
       // Network errors or other exceptions
@@ -451,6 +476,24 @@ export default function InvestmentInsightsPage() {
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Summary</h4>
                 <p className="text-gray-700 dark:text-gray-300">{aiInsights.summary}</p>
               </div>
+
+              {/* News Summaries Section */}
+              {aiInsights.newsSummaries && aiInsights.newsSummaries.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900 dark:text-white">📰 Recent News Summary</h4>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">Last 7 days</span>
+                  </div>
+                  <ul className="space-y-2">
+                    {aiInsights.newsSummaries.map((summary, idx) => (
+                      <li key={idx} className="flex items-start space-x-2">
+                        <span className="text-blue-500 mt-1">📄</span>
+                        <span className="text-gray-700 dark:text-gray-300">{summary}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>

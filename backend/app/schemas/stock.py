@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class StockQuery(BaseModel):
     """Schema for stock lookup query"""
@@ -27,4 +27,25 @@ class StockResponse(BaseModel):
     industry: Optional[str] = None
     currency: Optional[str] = None
     exchange: Optional[str] = None
+
+
+class NewsArticle(BaseModel):
+    """Schema for a news article"""
+    title: str
+    link: str
+    publisher: Optional[str] = None
+    published_at: Optional[str] = None
+    summary: Optional[str] = None
+
+
+class StockInsightsResponse(BaseModel):
+    """Schema for AI-driven stock insights response"""
+    summary: str
+    keyPoints: List[str]
+    newsSummaries: List[str]  # Bullet point summaries of news articles
+    recommendation: str  # "buy", "hold", "sell", or "research"
+    riskAssessment: str  # "low", "medium", "high"
+    studentFriendly: bool
+    educationalNotes: List[str]
+    newsArticles: List[NewsArticle]  # Full news articles for reference
 
