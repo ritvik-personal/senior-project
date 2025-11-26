@@ -139,18 +139,20 @@ def create_expense(
 
 def get_expense_by_category_and_user(category: str, user_id: str) -> Optional[Dict[str, Any]]:
     ##Change * depending on what we actually may need to work with.
-    query = _table().select("*").eq(["category"], [category]).eq(["user_id"], [user_id])
-    resp = query.single().execute()
-    if resp.data:
-        return _map_expense_fields(resp.data)
+    resp = _table().select("*").eq("category", category).eq("user_id", user_id).execute()
+    if resp and resp.data:
+        # Return the first match; callers expect a single expense
+        return _map_expense_fields(resp.data[0])
     return None
 
 def get_expense_by_id(expense_id: str) -> Optional[Dict[str, Any]]:
     ##Change * depending on what we actually may need to work with.
-    query = _table().select("*").eq(["expense_id"], [expense_id])  # Use expense_id instead of id
-    resp = query.single().execute()
-    if resp.data:
-        return _map_expense_fields(resp.data)
+    resp = _table().select("*").eq("expense_id", expense_id).execute()  # Use expense_id instead of id
+    if resp and resp.data:
+        logger.debug("get_expense_by_id(%s) fetched: %s", expense_id, resp.data[0])
+        # Return the first match; duplicates should not happen but don't crash if they do
+        return _map_expense_fields(resp.data[0])
+    logger.debug("get_expense_by_id(%s) returned no data. Raw response: %s", expense_id, resp)
     return None
 
 
@@ -245,20 +247,27 @@ def update_expense(
     expense_id: str,
     updates: Dict[str, Any],
     access_token: Optional[str] = None,
+    current_user_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
-    # Get the current expense
-    current_expense = get_expense_by_id(expense_id)
-    if not current_expense:
-        return None
-    
-    # Get the full expense data from database
     table = _authenticated_table(access_token) if access_token else _table()
+    
+    # Get the full expense data from database (enforces RLS when token supplied)
     current_expense_db = table.select("*").eq("expense_id", expense_id).execute()
     if not current_expense_db.data:
         return None
     
     current_expense_data = current_expense_db.data[0]
     user_id = current_expense_data.get("user_id")
+
+    # Enforce caller ownership when user context is provided
+    if current_user_id and user_id != current_user_id:
+        logger.warning(
+            "update_expense denied: expense %s belongs to %s, caller %s",
+            expense_id,
+            user_id,
+            current_user_id,
+        )
+        return None
     
     # Check if this is a group expense by looking for related transactions
     # We don't store group_id in expenses table, so check transactions instead
@@ -356,12 +365,22 @@ def update_expense(
             # Continue with expense update even if transaction update fails
 
     if not clean_updates:
-        return get_expense_by_id(expense_id)
+        return _map_expense_fields(current_expense_data)
 
     try:
-        resp = table.update(clean_updates).eq("expense_id", expense_id).execute()  # Use expense_id
+        resp = (
+            table
+            .update(clean_updates)
+            .eq("expense_id", expense_id)
+            .execute()
+        )
         if resp.data:
             return _map_expense_fields(resp.data[0])
+        
+        # Fallback: fetch the updated record using the same authenticated table
+        refreshed = table.select("*").eq("expense_id", expense_id).execute()
+        if refreshed.data:
+            return _map_expense_fields(refreshed.data[0])
         return None
     except Exception as exc:
         logger.error("Update expense failed: %s", exc)
