@@ -128,6 +128,7 @@ async def list_expenses_endpoint(
 async def update_expense_endpoint(
     expense_id: str = Path(..., description="Expense ID"),
     expense_update: ExpenseUpdate = None,
+    current_user_id: str = Depends(get_current_user_id),
     access_token: str = Depends(get_access_token)
 ):
     """Update an expense"""
@@ -140,7 +141,12 @@ async def update_expense_endpoint(
     if not updates:
         raise HTTPException(status_code=400, detail="No valid fields to update")
     
-    result = update_expense(expense_id, updates, access_token=access_token)
+    result = update_expense(
+        expense_id,
+        updates,
+        access_token=access_token,
+        current_user_id=current_user_id
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Expense not found or update failed")
     return ExpenseResponse(**result)
