@@ -109,8 +109,8 @@ def create_expense(
                 for participant_id in participant_user_ids:
                     create_transaction(
                         group_id=group_id,
-                        user_owed=user_id,  # The expense creator is owed money
-                        user_owing=participant_id,  # Each participant owes money
+                        user_owed=participant_id,  # Track who owes money
+                        user_owing=user_id,  # Expense creator is the creditor
                         amount=amount_per_person,
                         notes=description,  # Pass the expense notes/description
                         expense_id=expense_id,  # Link transaction to expense for cascade
@@ -331,8 +331,8 @@ def update_expense(
                 for participant_id in participant_user_ids:
                     create_transaction(
                         group_id=group_id,
-                        user_owed=user_id,
-                        user_owing=participant_id,
+                        user_owed=participant_id,
+                        user_owing=user_id,
                         amount=amount_per_person,
                         notes=new_description,
                         expense_id=expense_id,

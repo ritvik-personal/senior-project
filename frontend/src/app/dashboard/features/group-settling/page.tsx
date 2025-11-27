@@ -120,12 +120,17 @@ export default function GroupSettlingPage() {
       })),
     ];
 
+    const isSettlement = (backendTrans.notes || "").toLowerCase() === "settlement";
+    const totalAmount = isSettlement
+      ? backendTrans.amount_per_person * Math.max(1, backendTrans.user_owing_list.length)
+      : backendTrans.total_amount;
+
     return {
       transaction_id: backendTrans.transaction_ids.join(","),
       group_id: backendTrans.group_id,
       payer_id: payerId,
       payer_name: getUserDisplayName(payerId, userId, emails),
-      amount: backendTrans.total_amount,
+      amount: totalAmount,
       description: backendTrans.notes || `Split expense - ${backendTrans.participant_count} people`,
       created_at: backendTrans.created_at,
       participants,

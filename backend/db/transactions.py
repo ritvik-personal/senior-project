@@ -199,16 +199,24 @@ def get_grouped_transactions_for_user(user_id: str, group_ids: List[str]) -> Dic
             continue
         
         # Calculate total amount (amount * number of participants including user_owed)
-        # Each transaction has amount per person, so total = amount * (count + 1)
         participant_count = len(user_owing_set)
         sample_transaction = transaction_group[0]
         amount_per_person = float(sample_transaction.get("amount", 0))
-        total_amount = round(amount_per_person * (participant_count + 1), 2)
+        notes_raw = sample_transaction.get("notes")
+        notes = (notes_raw or "").strip().lower()
+
+        # Settlements represent a single repayment, so total_amount should reflect
+        # the actual transfer amount rather than the split multiplier.
+        if notes == "settlement":
+            # Settlement totals are the sum of what each participant paid back.
+            total_amount = round(amount_per_person * max(1, participant_count), 2)
+        else:
+            total_amount = round(amount_per_person * (participant_count + 1), 2)
         
         # Get group info
         group_id = transaction.get("group_id")
         user_owed = transaction.get("user_owed")
-        notes = sample_transaction.get("notes")  # Get notes from the sample transaction
+        original_notes = notes_raw  # Preserve original casing for response
         
         grouped_transaction = {
             "group_id": group_id,
@@ -219,7 +227,7 @@ def get_grouped_transactions_for_user(user_id: str, group_ids: List[str]) -> Dic
             "participant_count": participant_count + 1,  # +1 for user_owed
             "created_at": created_at_str,
             "transaction_ids": [t.get("transaction_id") for t in transaction_group],
-            "notes": notes  # Include notes in the grouped transaction
+            "notes": original_notes  # Include notes in the grouped transaction
         }
         
         grouped_transactions.append(grouped_transaction)
