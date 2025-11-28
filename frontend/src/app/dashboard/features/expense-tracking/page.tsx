@@ -22,6 +22,7 @@ interface Expense {
   type: "personal" | "group";
   groupId?: string;
   participants?: string[];
+  credit?: boolean; // If true, this is income/revenue and should be subtracted from expenses
 }
 
 interface Category {
@@ -59,7 +60,6 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
   const [showAddForm, setShowAddForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
-  const [showUploadForm, setShowUploadForm] = useState(false);
 
   const [selectedCategory, setSelectedCategory] = useState("");
   const [amount, setAmount] = useState("");
@@ -175,6 +175,11 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
 
         const response = await api.get("expenses/?limit=100");
         const data = await response.json();
+        
+        // Debug: Log expenses to see credit field
+        console.log("Loaded expenses from backend:", data.expenses.length, "expenses");
+        const creditExpenses = data.expenses.filter((e: any) => e.credit === true || e.credit === "true");
+        console.log("Credit expenses found:", creditExpenses.length, creditExpenses);
 
         const frontendExpenses: Expense[] = data.expenses.map((expense: any) => {
           // Map participant IDs to emails if available
@@ -200,6 +205,7 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
             type: expense.is_group_expense ? "group" : "personal",
             groupId: expense.group_id,
             participants: participantEmails.length > 0 ? participantEmails : expense.participant_user_ids || [],
+            credit: expense.credit === true || expense.credit === "true", // Include credit field from backend, handle string/boolean
           };
         });
         setExpenses(frontendExpenses);
@@ -261,6 +267,7 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
                   category: updated.category,
                   description: updated.description || "",
                   date: expenseDate,
+                  credit: updated.credit || false, // Include credit field from backend
                 }
               : exp
           )
@@ -295,6 +302,7 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
           type: expenseType,
           groupId: selectedGroup || undefined,
           participants: expenseType === "group" ? participantEmails : [],
+          credit: createdExpense.credit || false, // Include credit field from backend
         };
 
         setExpenses([newExpense, ...expenses]);
@@ -313,49 +321,6 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
     } catch (error) {
       console.error("Error creating expense:", error);
       alert("Failed to create expense. Please try again.");
-    }
-  };
-
-  const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setTimeout(async () => {
-        try {
-          const token = api.getToken();
-          if (!token) {
-            alert('Please log in to upload receipts');
-            return;
-          }
-
-          const mockOCRData = {
-            amount_dollars: 15.99,
-            credit: false,
-            category: "Food",
-            description: "Coffee and pastry from campus cafe"
-          };
-
-          const response = await api.post('expenses/', mockOCRData);
-          const createdExpense = await response.json();
-          const newExpense: Expense = {
-            id: createdExpense.id,
-            amount: createdExpense.amount_dollars,
-            category: createdExpense.category,
-            description: createdExpense.description || "",
-            date: new Date().toISOString().split("T")[0],
-            type: "personal",
-          };
-          setExpenses([newExpense, ...expenses]);
-          setShowUploadForm(false);
-        } catch (error) {
-          console.error('Error creating expense from receipt:', error);
-          alert('Failed to process receipt. Please try again.');
-        }
-      }, 2000);
-    } catch (error) {
-      console.error('Error processing receipt:', error);
-      alert('Failed to process receipt. Please try again.');
     }
   };
 
@@ -388,14 +353,29 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
     }
   };
 
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  // Calculate total expenses: add regular expenses, subtract credit expenses (income)
+  const totalExpenses = expenses.reduce((sum, expense) => {
+    const isCredit = expense.credit === true || expense.credit === "true";
+    if (isCredit) {
+      return sum - expense.amount; // Subtract credit expenses (income/revenue)
+    }
+    return sum + expense.amount; // Add regular expenses
+  }, 0);
+  
   const monthlyExpenses = expenses
     .filter((expense) => {
       const expenseDate = new Date(expense.date);
       const currentMonth = new Date().getMonth();
-      return expenseDate.getMonth() === currentMonth;
+      const currentYear = new Date().getFullYear();
+      return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
     })
-    .reduce((sum, expense) => sum + expense.amount, 0);
+    .reduce((sum, expense) => {
+      const isCredit = expense.credit === true || expense.credit === "true";
+      if (isCredit) {
+        return sum - expense.amount; // Subtract credit expenses (income/revenue)
+      }
+      return sum + expense.amount; // Add regular expenses
+    }, 0);
 
   const currentGroupMembers = groups.find((g) => g.id === selectedGroup)?.members || [];
   // All groups returned from API are the user's groups
@@ -413,12 +393,6 @@ return (
       </div>
       <div className="flex space-x-3">
         <button
-          onClick={() => setShowUploadForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          📷 Upload Receipt
-        </button>
-        <button
           onClick={() => setShowAddForm(true)}
           className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
         >
@@ -435,10 +409,13 @@ return (
             <span className="text-2xl">💸</span>
           </div>
           <div className="ml-4">
-            <p className="text-sm text-gray-600 dark:text-gray-300">Total Expenses</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              ${totalExpenses.toFixed(2)}
+            <p className="text-sm text-gray-600 dark:text-gray-300">Net Expenses</p>
+            <p className={`text-2xl font-bold ${totalExpenses < 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+              {totalExpenses < 0 ? '-' : ''}${Math.abs(totalExpenses).toFixed(2)}
             </p>
+            {totalExpenses < 0 && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">Income exceeds expenses</p>
+            )}
           </div>
         </div>
       </div>
@@ -448,10 +425,13 @@ return (
             <span className="text-2xl">📅</span>
           </div>
           <div className="ml-4">
-            <p className="text-sm text-gray-600 dark:text-gray-300">This Month</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              ${monthlyExpenses.toFixed(2)}
+            <p className="text-sm text-gray-600 dark:text-gray-300">This Month (Net)</p>
+            <p className={`text-2xl font-bold ${monthlyExpenses < 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+              {monthlyExpenses < 0 ? '-' : ''}${Math.abs(monthlyExpenses).toFixed(2)}
             </p>
+            {monthlyExpenses < 0 && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">Income exceeds expenses</p>
+            )}
           </div>
         </div>
       </div>
@@ -703,46 +683,6 @@ return (
       </div>
     )}
 
-    {/* UPLOAD RECEIPT POPUP */}
-    {showUploadForm && (
-      <div
-        className={`fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50 transition-opacity ${
-          showUploadForm ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-      >
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 relative">
-          <button
-            onClick={() => setShowUploadForm(false)}
-            className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
-          >
-            ✖
-          </button>
-
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Upload Receipt
-          </h3>
-          <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleReceiptUpload}
-              className="hidden"
-              id="receipt-upload"
-            />
-            <label htmlFor="receipt-upload" className="cursor-pointer">
-              <span className="text-6xl mb-4 block">📷</span>
-              <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                Click to upload receipt
-              </p>
-              <p className="text-gray-600 dark:text-gray-300">
-                OCR will automatically extract expense details
-              </p>
-            </label>
-          </div>
-        </div>
-      </div>
-    )}
-
     {/* EXPENSE LIST */}
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
@@ -760,6 +700,7 @@ return (
         <div className="space-y-3">
           {expenses.map((expense) => {
             const category = categories.find((cat) => cat.id === expense.category);
+            const isCredit = expense.credit === true || expense.credit === "true";
             return (
               <div
                 key={expense.id}
@@ -775,8 +716,9 @@ return (
                     <p className="font-medium text-gray-900 dark:text-white">
                       {expense.description}
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
                       {category?.name} • {expense.date} • {expense.type}
+                      {expense.credit && " • Income"}
                     </p>
                     {expense.type === "group" && expense.groupId && (
                       <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -801,8 +743,8 @@ return (
                   >
                     Delete
                   </button>
-                  <p className="font-bold text-gray-900 dark:text-white">
-                    ${expense.amount.toFixed(2)}
+                  <p className={`font-bold ${expense.credit ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+                    {expense.credit ? '+' : ''}${expense.amount.toFixed(2)}
                   </p>
                 </div>
               </div>

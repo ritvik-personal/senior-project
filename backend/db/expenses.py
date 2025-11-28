@@ -22,7 +22,7 @@ def _map_expense_fields(expense_data: Dict[str, Any]) -> Dict[str, Any]:
         "id": str(expense_data.get("expense_id", "")),  # Map expense_id to id, ensure string
         "user_id": expense_data.get("user_id"),
         "amount_dollars": expense_data.get("amount"),  # Map amount to amount_dollars
-        "credit": expense_data.get("credit"),
+        "credit": bool(expense_data.get("credit", False)),  # Ensure boolean, default to False if not set
         "category": expense_data.get("category"),
         "description": expense_data.get("notes"),  # Map notes to description
         "created_at": expense_data.get("created_at"),
@@ -106,11 +106,13 @@ def create_expense(
                 logger.debug(f"Creating {len(participant_user_ids)} transactions for expense {expense_id}")
                 
                 # Create a transaction for each participant with the expense_id
+                # Expense creator (user_id) is user_owed (they're owed money by participants)
+                # Participants are user_owing (they owe money to the expense creator)
                 for participant_id in participant_user_ids:
                     create_transaction(
                         group_id=group_id,
-                        user_owed=participant_id,  # Track who owes money
-                        user_owing=user_id,  # Expense creator is the creditor
+                        user_owed=user_id,  # Expense creator is owed money (authenticated user)
+                        user_owing=participant_id,  # Participant owes money
                         amount=amount_per_person,
                         notes=description,  # Pass the expense notes/description
                         expense_id=expense_id,  # Link transaction to expense for cascade
@@ -327,12 +329,14 @@ def update_expense(
                 amount_per_person = new_amount / total_participants
                 
                 # Create new transactions with updated participants
+                # Expense creator (user_id) is user_owed (they're owed money)
+                # Participants are user_owing (they owe money)
                 new_description = updates.get("description") or current_expense_data.get("notes")
                 for participant_id in participant_user_ids:
                     create_transaction(
                         group_id=group_id,
-                        user_owed=participant_id,
-                        user_owing=user_id,
+                        user_owed=user_id,  # Expense creator is owed money
+                        user_owing=participant_id,  # Participant owes money
                         amount=amount_per_person,
                         notes=new_description,
                         expense_id=expense_id,
@@ -391,6 +395,20 @@ def delete_expense(
     expense_id: str,
     access_token: Optional[str] = None,
 ) -> bool:
+    # First, delete all related transactions (cascade delete)
+    # This ensures that when an expense is deleted, all associated transactions are also deleted
+    try:
+        from db.transactions import delete_transactions_by_expense_id
+        deleted = delete_transactions_by_expense_id(expense_id, access_token=access_token)
+        if deleted:
+            logger.info(f"Cascade deleted all transactions for expense {expense_id}")
+        else:
+            logger.debug(f"No transactions found to delete for expense {expense_id}")
+    except Exception as e:
+        logger.warning(f"Failed to delete transactions for expense {expense_id}: {e}", exc_info=True)
+        # Continue with expense deletion even if transaction deletion fails
+    
+    # Then delete the expense itself
     table = _authenticated_table(access_token) if access_token else _table()
     resp = table.delete().eq("expense_id", expense_id).execute()
     # If RLS disallows returning rows on delete, data may be None even when successful
@@ -407,7 +425,7 @@ def sum_expenses(
     access_token: Optional[str] = None,
 ) -> int:
     table = _authenticated_table(access_token) if access_token else _table()
-    query = table.select("amount", head=False).eq("user_id", user_id)
+    query = table.select("amount, credit", head=False).eq("user_id", user_id)
     if start_date:
         query = query.gte("created_at", start_date.isoformat())
     if end_date:
@@ -421,7 +439,14 @@ def sum_expenses(
     for row in rows:
         try:
             # amount may be float/decimal
-            total += float(row.get("amount", 0))
+            amount = float(row.get("amount", 0))
+            credit = row.get("credit", False)
+            # If credit is True, subtract the amount (it's income/revenue)
+            # If credit is False, add the amount (it's an expense)
+            if credit:
+                total -= amount
+            else:
+                total += amount
         except (TypeError, ValueError):
             continue
     return total
