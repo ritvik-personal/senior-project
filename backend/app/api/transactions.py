@@ -43,6 +43,7 @@ async def create_transaction_endpoint(
             expense_id=transaction.expense_id,
             access_token=access_token
         )
+        
         return TransactionResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
