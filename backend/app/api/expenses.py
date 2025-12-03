@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Path, Depends
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from db.expenses import (
     create_expense,
@@ -9,7 +9,8 @@ from db.expenses import (
     list_expenses,
     update_expense,
     delete_expense,
-    sum_expenses
+    sum_expenses,
+    sum_paycheck_expenses
 )
 from app.schemas.expense import (
     ExpenseCreate,
@@ -18,6 +19,7 @@ from app.schemas.expense import (
     ExpenseListResponse
 )
 from app.utils.auth import get_current_user_id, get_access_token
+from app.constants import ExpenseCategory
 
 router = APIRouter()
 
@@ -29,10 +31,15 @@ async def create_expense_endpoint(
 ):
     """Create a new expense"""
     try:
+        # If category is "Paycheck", explicitly set credit to True
+        credit_value = expense.credit
+        if expense.category == ExpenseCategory.PAYCHECK.value:
+            credit_value = True
+        
         result = create_expense(
             user_id=current_user_id,
             amount_dollars=expense.amount_dollars,
-            credit=expense.credit,
+            credit=credit_value,
             category=expense.category,
             description=expense.description,
             metadata=expense.metadata,
@@ -73,13 +80,74 @@ async def create_expense_endpoint(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/{expense_id}", response_model=ExpenseResponse)
-async def get_expense_endpoint(expense_id: str = Path(..., description="Expense ID")):
-    """Get an expense by ID"""
-    result = get_expense_by_id(expense_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Expense not found")
-    return ExpenseResponse(**result)
+@router.get("/sum/total")
+async def sum_expenses_endpoint(
+    start_date: Optional[date] = Query(None, description="Filter by start date"),
+    end_date: Optional[date] = Query(None, description="Filter by end date"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token)
+):
+    """Get the sum of expenses with optional filtering"""
+    total = sum_expenses(
+        user_id=current_user_id,
+        start_date=start_date,
+        end_date=end_date,
+        category=category,
+        access_token=access_token
+    )
+    
+    return {"total_amount": total, "user_id": current_user_id}
+
+@router.get("/sum/monthly")
+async def sum_monthly_expenses_endpoint(
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token)
+):
+    """Get the sum of expenses for the current calendar month"""
+    now = datetime.utcnow()
+    # Start of current month
+    start_of_month = date(year=now.year, month=now.month, day=1)
+    # End date is today (current date)
+    end_date = now.date()
+    
+    total = sum_expenses(
+        user_id=current_user_id,
+        start_date=start_of_month,
+        end_date=end_date,
+        category=None,
+        access_token=access_token
+    )
+    return {"total_amount": total, "user_id": current_user_id}
+
+@router.get("/sum/overall")
+async def sum_overall_expenses_endpoint(
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token)
+):
+    """Get the sum of all expenses for the current user"""
+    total = sum_expenses(user_id=current_user_id, access_token=access_token)
+    return {"total_amount": total, "user_id": current_user_id}
+
+@router.get("/sum/paycheck/monthly")
+async def sum_paycheck_monthly_endpoint(
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token)
+):
+    """Get the sum of paycheck expenses for the current calendar month"""
+    now = datetime.utcnow()
+    # Start of current month
+    start_of_month = date(year=now.year, month=now.month, day=1)
+    # End date is today (current date)
+    end_date = now.date()
+    
+    total = sum_paycheck_expenses(
+        user_id=current_user_id,
+        start_date=start_of_month,
+        end_date=end_date,
+        access_token=access_token
+    )
+    return {"total_amount": total, "user_id": current_user_id}
 
 @router.get("/category/{category}", response_model=ExpenseResponse)
 async def get_expense_by_category_endpoint(
@@ -138,6 +206,10 @@ async def update_expense_endpoint(
     # Convert Pydantic model to dict, excluding None values
     updates = {k: v for k, v in expense_update.dict().items() if v is not None}
     
+    # If category is being updated to "Paycheck", explicitly set credit to True
+    if "category" in updates and updates["category"] == ExpenseCategory.PAYCHECK.value:
+        updates["credit"] = True
+    
     if not updates:
         raise HTTPException(status_code=400, detail="No valid fields to update")
     
@@ -163,54 +235,11 @@ async def delete_expense_endpoint(
     
     return {"message": "Expense deleted successfully"}
 
-@router.get("/sum/total")
-async def sum_expenses_endpoint(
-    start_date: Optional[date] = Query(None, description="Filter by start date"),
-    end_date: Optional[date] = Query(None, description="Filter by end date"),
-    category: Optional[str] = Query(None, description="Filter by category"),
-    current_user_id: str = Depends(get_current_user_id),
-    access_token: str = Depends(get_access_token)
-):
-    """Get the sum of expenses with optional filtering"""
-    total = sum_expenses(
-        user_id=current_user_id,
-        start_date=start_date,
-        end_date=end_date,
-        category=category,
-        access_token=access_token
-    )
-    
-    return {"total_amount": total, "user_id": current_user_id}
-
-@router.get("/sum/monthly")
-async def sum_monthly_expenses_endpoint(
-    current_user_id: str = Depends(get_current_user_id),
-    access_token: str = Depends(get_access_token)
-):
-    """Get the sum of expenses for the current month"""
-    now = datetime.utcnow()
-    start_of_month = date(year=now.year, month=now.month, day=1)
-    # End of month: next month first day minus one day
-    if now.month == 12:
-        end_of_month = date(year=now.year, month=12, day=31)
-    else:
-        next_month_first = date(year=now.year, month=now.month + 1, day=1)
-        end_of_month = next_month_first
-    total = sum_expenses(
-        user_id=current_user_id,
-        start_date=start_of_month,
-        end_date=end_of_month,
-        category=None,
-        access_token=access_token
-    )
-    return {"total_amount": total, "user_id": current_user_id}
-
-@router.get("/sum/overall")
-async def sum_overall_expenses_endpoint(
-    current_user_id: str = Depends(get_current_user_id),
-    access_token: str = Depends(get_access_token)
-):
-    """Get the sum of all expenses for the current user"""
-    total = sum_expenses(user_id=current_user_id, access_token=access_token)
-    return {"total_amount": total, "user_id": current_user_id}
+@router.get("/{expense_id}", response_model=ExpenseResponse)
+async def get_expense_endpoint(expense_id: str = Path(..., description="Expense ID")):
+    """Get an expense by ID"""
+    result = get_expense_by_id(expense_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    return ExpenseResponse(**result)
 

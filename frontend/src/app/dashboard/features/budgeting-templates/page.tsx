@@ -327,6 +327,13 @@ export default function BudgetingTemplatesPage() {
     setSavingsGoal(budget.savingsGoal.toString());
     setShowEditForm(true);
     setShowCreateForm(false);
+    // Scroll to edit form after a brief delay to ensure it's rendered
+    setTimeout(() => {
+      const editForm = document.getElementById('edit-budget-form');
+      if (editForm) {
+        editForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const handleCancelEdit = () => {
@@ -473,7 +480,7 @@ export default function BudgetingTemplatesPage() {
 
       {/* Edit Budget Form */}
       {showEditForm && editingBudget && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+        <div id="edit-budget-form" className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Edit Budget</h3>
           <form onSubmit={handleUpdateBudget} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
