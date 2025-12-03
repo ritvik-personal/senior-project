@@ -8,10 +8,12 @@
  * - Integration with FastAPI backend registration endpoint
  * - Token-based session management
  * - Error handling and loading states
- * - Automatic redirect to dashboard on successful registration
+ * - Email verification message displayed after successful registration
  * 
  * The component includes client-side validation for password matching
  * and length requirements before making API calls.
+ * After successful sign-up, users are shown a message to verify their email
+ * instead of being redirected to the dashboard.
  */
 
 "use client";
@@ -26,6 +28,7 @@ export default function SignUpPage() {
   // removed Full Name; original minimal signup: email + password
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [signUpSuccess, setSignUpSuccess] = useState(false);
   const router = useRouter();
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -70,8 +73,8 @@ export default function SignUpPage() {
         
         console.log("Sign up successful:", data);
         
-        // Redirect to dashboard
-        router.push("/dashboard");
+        // Show email verification message instead of redirecting
+        setSignUpSuccess(true);
       } else {
         const errorData = await response.json();
         setError(errorData.message || "Sign up failed");
@@ -83,6 +86,48 @@ export default function SignUpPage() {
       setIsLoading(false);
     }
   };
+
+  // Show email verification message if sign-up was successful
+  if (signUpSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+          <div className="text-center">
+            <div className="mb-6">
+              <svg 
+                className="mx-auto h-16 w-16 text-green-500" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" 
+                />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+              Check Your Email
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              We've sent a verification email to <strong>{email}</strong>. Please check your inbox and click the verification link to activate your account.
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              You must verify your email before you can access your dashboard.
+            </p>
+            <button 
+              onClick={() => router.push("/login")}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-colors"
+            >
+              Back to Log In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-8">
