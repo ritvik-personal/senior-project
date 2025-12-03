@@ -286,60 +286,34 @@ Industry: {info.get('industry', 'N/A')}
         else:
             news_text = "\n\nNo recent news articles found."
         
-        # Step 5: Call NVIDIA NIM to generate insights using COSTAR format
-        system_prompt = """You are a financial analyst providing educational stock insights for college students. 
-Your role is to analyze stock data and news to provide clear, actionable investment recommendations. 
+        # Step 5: Call NVIDIA NIM to generate simplified highlight-style insights
+        system_prompt = """You are a financial analyst providing simple, highlight-style stock analysis for college students. 
+Keep responses concise and easy to scan. Focus on the most important highlights only.
 Always emphasize that this is educational content, not financial advice."""
 
-        user_prompt = f"""Context: You have access to current stock data and recent news articles (from the last 7 days) for {symbol} ({company_name}). Use the provided stock data and news articles to generate actionable investment insights. Only analyze the news articles provided - do not reference or mention any outdated news (like iPhone 13 from 2021). Focus only on the current, recent news provided.
+        user_prompt = f"""Analyze the stock data and recent news (last 7 days) for {symbol} ({company_name}) and provide a simple highlight analysis.
 
-Objective: Analyze the stock data and recent news to provide actionable investment insights that help students make informed investment decisions. Generate a well-supported recommendation (buy/hold/sell/research) based on the analysis.
+Only use the news articles provided - do not reference outdated news. Focus on current information.
 
-Style: Clear, specific, and investment-focused. Explain what metrics mean for investment decisions, not just what they are. Use concrete examples and specific numbers from the stock data. Avoid generic statements.
-
-Tone: Professional, educational, and balanced. Be honest about risks and opportunities. Avoid being overly promotional or pessimistic.
-
-Audience: College students learning about investing who may be new to stock analysis but want actionable insights to make investment decisions.
-
-Response Format: Provide your analysis in the following JSON format. Return ONLY valid JSON, no additional text before or after:
+Return ONLY valid JSON in this format (no additional text):
 {{
-  "summary": "A 2-3 sentence overview of the stock's current investment situation and outlook",
-  "keyPoints": ["Actionable investment insight 1", "Actionable investment insight 2", "Actionable investment insight 3", "Actionable investment insight 4", "Actionable investment insight 5"],
-  "newsSummaries": ["Bullet summary of news article 1", "Bullet summary of news article 2", ...],
+  "summary": "One concise sentence about the stock's current situation",
+  "highlights": ["Brief highlight 1", "Brief highlight 2", "Brief highlight 3", "Brief highlight 4"],
   "recommendation": "buy|hold|sell|research",
-  "riskAssessment": "low|medium|high",
-  "studentFriendly": true,
-  "educationalNotes": ["Contextual investment insight 1", "Contextual investment insight 2", "Contextual investment insight 3"]
+  "riskAssessment": "low|medium|high"
 }}
 
-Guidelines for each field:
+Guidelines:
+- SUMMARY: One clear sentence (max 20 words) summarizing the stock's outlook
+- HIGHLIGHTS: 4 concise bullet points (max 15 words each) covering:
+  * Most important metric or trend
+  * Key news impact
+  * Valuation or financial health
+  * Market sentiment or outlook
+- RECOMMENDATION: "buy", "hold", "sell", or "research" based on the analysis
+- RISK ASSESSMENT: "low", "medium", or "high" based on volatility and fundamentals
 
-KEY POINTS (5 items required):
-- Focus on actionable investment insights, not just listing metrics
-- Explain what the metrics MEAN for investment decisions (e.g., "P/E ratio of 36 is 80% above market average, suggesting the stock may be overvalued unless the company can deliver strong earnings growth" instead of just "High P/E ratio")
-- Include insights about: valuation analysis, growth prospects, competitive position, financial health, market sentiment
-- Make each point specific to this stock's current situation using actual numbers from the data
-- Avoid generic statements - explain WHY it matters for investors
-
-EDUCATIONAL NOTES (3 items required):
-- Provide contextual investment insights specific to this stock, not generic definitions
-- Explain what the metrics mean FOR THIS PARTICULAR STOCK in the current market context
-- Focus on practical implications for investment decisions (e.g., "The 39% dividend yield appears unusually high - verify this isn't a data error, as sustainable yields are typically 2-6%")
-- Help students understand how to interpret these metrics for investment decisions
-- Avoid generic explanations - provide stock-specific context
-
-RECOMMENDATION (required):
-- Must be one of: "buy", "hold", "sell", or "research"
-- Should be well-supported by the key points and news analysis
-- "buy" = positive outlook, good entry point based on fundamentals and news
-- "hold" = neutral outlook, maintain position if already owned, wait for better entry if not
-- "sell" = negative outlook, consider exiting based on concerns
-- "research" = insufficient information, mixed signals, or need more data
-
-NEWS SUMMARIES (required):
-- Concise bullet points summarizing the most important news articles (one per article, max 10)
-- Focus on news that impacts investment decisions
-- Highlight positive/negative developments that affect the stock's outlook
+Keep it simple and scannable. Use specific numbers from the data when relevant.
 
 Stock Data:
 {stock_summary}
@@ -353,7 +327,7 @@ Recent News Articles (Last 7 Days):
         ]
         
         try:
-            ai_response = await call_nim_chat_completion(messages, max_tokens=2000)
+            ai_response = await call_nim_chat_completion(messages, max_tokens=800)
             
             # Parse JSON response from AI
             # Sometimes AI adds markdown code blocks, so we need to extract JSON
@@ -377,14 +351,11 @@ Recent News Articles (Last 7 Days):
                 else:
                     raise ValueError("Could not parse JSON from AI response")
             
-            # Validate and extract data
+            # Validate and extract data from simplified format
             summary = insights_data.get("summary", "Analysis unavailable")
-            key_points = insights_data.get("keyPoints", [])
-            news_summaries = insights_data.get("newsSummaries", [])
+            highlights = insights_data.get("highlights", [])
             recommendation = insights_data.get("recommendation", "research").lower()
             risk_assessment = insights_data.get("riskAssessment", "medium").lower()
-            student_friendly = insights_data.get("studentFriendly", True)
-            educational_notes = insights_data.get("educationalNotes", [])
             
             # Ensure recommendation is valid
             if recommendation not in ["buy", "hold", "sell", "research"]:
@@ -393,6 +364,21 @@ Recent News Articles (Last 7 Days):
             # Ensure risk assessment is valid
             if risk_assessment not in ["low", "medium", "high"]:
                 risk_assessment = "medium"
+            
+            # Use highlights directly as keyPoints (backward compatible with schema)
+            key_points = highlights if highlights else []
+            
+            # Extract news-related highlights as news summaries, or use actual news if available
+            news_summaries = []
+            for highlight in highlights:
+                if any(keyword in highlight.lower() for keyword in ["news", "announced", "reported", "releases", "earnings", "revenue"]):
+                    news_summaries.append(highlight)
+            
+            # If no news summaries from highlights but we have news articles, create simple summaries
+            if not news_summaries and news_articles:
+                # Use first few article titles as simple summaries
+                news_summaries = [article.get("title", "")[:80] + "..." if len(article.get("title", "")) > 80 else article.get("title", "") 
+                                 for article in news_articles[:3] if article.get("title")]
             
             # Convert news articles to schema format
             news_article_models = [
@@ -412,8 +398,8 @@ Recent News Articles (Last 7 Days):
                 newsSummaries=news_summaries,
                 recommendation=recommendation,
                 riskAssessment=risk_assessment,
-                studentFriendly=student_friendly,
-                educationalNotes=educational_notes,
+                studentFriendly=True,
+                educationalNotes=[],  # Empty for simplified format
                 newsArticles=news_article_models
             )
             

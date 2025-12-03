@@ -78,25 +78,19 @@ export default function InvestmentInsightsPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const aiInsightsRef = useRef<HTMLDivElement>(null);
 
-  // Sample AI insights (fallback if API fails)
+  // Sample AI insights (fallback if API fails) - simplified highlight format
   const sampleInsights: AIInsights = {
-    summary: "Apple Inc. is a technology giant with strong fundamentals and a loyal customer base. The company has demonstrated consistent growth through its ecosystem of products and services, including iPhone, Mac, iPad, and services like Apple Music and iCloud.",
+    summary: "Strong fundamentals with consistent growth, though trading at premium valuation.",
     keyPoints: [
-      "Strong brand loyalty and ecosystem lock-in effect",
-      "Consistent revenue growth from services segment",
-      "High profit margins and strong cash position",
-      "Innovation in AI and augmented reality",
-      "Geographic diversification reducing risk"
+      "P/E ratio above market average suggests premium valuation",
+      "Services revenue showing strong growth trajectory",
+      "Solid cash position and high profit margins",
+      "Technology sector volatility requires risk consideration"
     ],
     newsSummaries: [],
     riskAssessment: 'medium',
     studentFriendly: true,
-    educationalNotes: [
-      "P/E ratio of 28.5 is higher than market average, indicating premium valuation",
-      "Dividend yield of 0.5% is low but company focuses on growth over dividends",
-      "Market cap of $2.8T makes it one of the largest companies globally",
-      "Technology sector can be volatile, so consider your risk tolerance"
-    ],
+    educationalNotes: [],
     recommendation: 'research'
   };
 
@@ -488,11 +482,28 @@ export default function InvestmentInsightsPage() {
                 <p className="text-gray-700 dark:text-gray-300">{aiInsights.summary}</p>
               </div>
 
+              {/* Highlights Section */}
+              {aiInsights.keyPoints && aiInsights.keyPoints.filter(p => p && p.trim()).length > 0 && (
+                <div className="mb-6">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Highlights</h4>
+                  <ul className="space-y-2">
+                    {aiInsights.keyPoints
+                      .filter(point => point && point.trim())
+                      .map((point, idx) => (
+                        <li key={idx} className="flex items-start space-x-2">
+                          <span className="text-green-500 mt-1">•</span>
+                          <span className="text-gray-700 dark:text-gray-300">{point}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+
               {/* News Summaries Section */}
               {aiInsights.newsSummaries && aiInsights.newsSummaries.length > 0 && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-gray-900 dark:text-white">📰 Recent News Summary</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-white">📰 Recent News</h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400">Last 7 days</span>
                   </div>
                   <ul className="space-y-2">
@@ -506,20 +517,9 @@ export default function InvestmentInsightsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Key Points</h4>
-                  <ul className="space-y-2">
-                    {aiInsights.keyPoints.map((point, idx) => (
-                      <li key={idx} className="flex items-start space-x-2">
-                        <span className="text-green-500 mt-1">•</span>
-                        <span className="text-gray-700 dark:text-gray-300">{point}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
+              {/* Educational Notes - only show if present */}
+              {aiInsights.educationalNotes && aiInsights.educationalNotes.length > 0 && (
+                <div className="mb-6">
                   <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Educational Notes</h4>
                   <ul className="space-y-2">
                     {aiInsights.educationalNotes.map((note, idx) => (
@@ -530,7 +530,7 @@ export default function InvestmentInsightsPage() {
                     ))}
                   </ul>
                 </div>
-              </div>
+              )}
 
               <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                 <div className="flex items-start space-x-2">
