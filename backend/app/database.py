@@ -14,6 +14,9 @@ def get_supabase_client() -> Client:
 def get_authenticated_client(access_token: str) -> Client:
     """Get Supabase client authenticated with user token"""
     client = create_client(settings.SUPABASE_URL, settings.SUPABASE_PUBLIC_KEY)
+    # Set the session with the access token
+    # Note: The second parameter is refresh_token, which we don't have
+    # This should still work for RLS policies
     client.auth.set_session(access_token, "")
     return client
 

@@ -30,7 +30,8 @@ router = APIRouter()
 @router.post("/", response_model=TransactionResponse)
 async def create_transaction_endpoint(
     transaction: TransactionCreate,
-    access_token: str = Depends(get_access_token)
+    access_token: str = Depends(get_access_token),
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Create a new transaction"""
     try:
@@ -43,6 +44,54 @@ async def create_transaction_endpoint(
             expense_id=transaction.expense_id,
             access_token=access_token
         )
+        
+        # If this is a settlement transaction, create expense entries for both parties
+        # We use a database function that bypasses RLS to avoid policy complexity
+        if transaction.notes and transaction.notes.lower() == "settlement":
+            try:
+                from app.constants import ExpenseCategory
+                from datetime import date
+                from app.database import get_authenticated_client
+                
+                # Get authenticated Supabase client
+                supabase_client = get_authenticated_client(access_token)
+                
+                # Transaction structure: user_owed = payer, user_owing = recipient
+                # 1. Create expense for the payer (user_owed) - this is a cost/expense (credit=false)
+                try:
+                    payer_result = supabase_client.rpc('create_settlement_expense', {
+                        'p_user_id': transaction.user_owed,
+                        'p_amount': transaction.amount,
+                        'p_credit': False,
+                        'p_category': ExpenseCategory.SETTLEMENT.value,
+                        'p_notes': 'Settlement paid to group member',
+                        'p_created_at': date.today().isoformat(),
+                        'p_authenticated_user_id': current_user_id
+                    }).execute()
+                    logger.info(f"Created settlement expense (debit) for payer {transaction.user_owed}")
+                except Exception as payer_expense_error:
+                    logger.warning(f"Failed to create settlement expense for payer {transaction.user_owed}: {payer_expense_error}")
+                
+                # 2. Create expense for the recipient (user_owing) - this is income (credit=true)
+                try:
+                    recipient_result = supabase_client.rpc('create_settlement_expense', {
+                        'p_user_id': transaction.user_owing,
+                        'p_amount': transaction.amount,
+                        'p_credit': True,
+                        'p_category': ExpenseCategory.SETTLEMENT.value,
+                        'p_notes': 'Settlement received from group transaction',
+                        'p_created_at': date.today().isoformat(),
+                        'p_authenticated_user_id': current_user_id
+                    }).execute()
+                    logger.info(f"Successfully created settlement expense (credit) for recipient {transaction.user_owing}")
+                except Exception as recipient_expense_error:
+                    logger.error(f"Failed to create settlement expense for recipient {transaction.user_owing}: {recipient_expense_error}")
+                    logger.error(f"Payer user_id: {transaction.user_owed}, Recipient user_id: {transaction.user_owing}")
+                    
+            except Exception as expense_error:
+                # If expense creation fails, log it but don't fail the transaction
+                logger.warning(f"Failed to create settlement expenses: {expense_error}")
+                # Transaction creation still succeeds even if expense creation fails
         
         return TransactionResponse(**result)
     except Exception as e:
@@ -184,16 +233,33 @@ async def get_transactions_endpoint(
         # Extract group IDs
         group_ids = [group.get("group_id") for group in user_groups if group.get("group_id")]
         
-        # Get grouped transactions
-        result = get_grouped_transactions_for_user(current_user_id, group_ids)
+        # Get grouped transactions (pass access_token for RLS)
+        result = get_grouped_transactions_for_user(current_user_id, group_ids, access_token)
         
         # Collect unique user IDs to fetch emails
         unique_user_ids = set()
-        for trans in result.get("transactions", []):
-            unique_user_ids.add(trans.get("user_owed"))
-            unique_user_ids.update(trans.get("user_owing_list", []))
+        # Always include the current user
+        if current_user_id:
+            unique_user_ids.add(current_user_id)
         
-        logger.info(f"Found unique user IDs: {unique_user_ids}")
+        # Extract user IDs from transactions
+        transactions_list = result.get("transactions", [])
+        logger.info(f"Processing {len(transactions_list)} transactions")
+        
+        for trans in transactions_list:
+            # Add user_owed if it exists and is not None
+            user_owed = trans.get("user_owed")
+            if user_owed and isinstance(user_owed, str) and user_owed.strip():
+                unique_user_ids.add(user_owed)
+            
+            # Add all users from user_owing_list if it exists
+            user_owing_list = trans.get("user_owing_list", [])
+            if isinstance(user_owing_list, list):
+                for user_id in user_owing_list:
+                    if user_id and isinstance(user_id, str) and user_id.strip():
+                        unique_user_ids.add(user_id)
+        
+        logger.info(f"Found unique user IDs: {unique_user_ids} (count: {len(unique_user_ids)})")
         
         # Fetch user emails using RPC function (same approach as groups module)
         user_emails: Dict[str, str] = {}

@@ -353,24 +353,28 @@ export default function ExpenseTrackingPage({ initialShowAddForm = false }: { in
     }
   };
 
-  // Calculate total expenses: add regular expenses, subtract credit expenses (income)
-  const totalExpenses = expenses.reduce((sum, expense) => {
-    const isCredit = expense.credit === true || expense.credit === "true";
-    if (isCredit) {
-      return sum - expense.amount; // Subtract credit expenses (income/revenue)
-    }
-    return sum + expense.amount; // Add regular expenses
-  }, 0);
+  // Calculate total expenses: exclude Paycheck category
+  const totalExpenses = expenses
+    .filter((expense) => expense.category !== "Paycheck")
+    .reduce((sum, expense) => {
+      const isCredit = expense.credit === true;
+      if (isCredit) {
+        return sum - expense.amount; // Subtract credit expenses (income/revenue)
+      }
+      return sum + expense.amount; // Add regular expenses
+    }, 0);
   
   const monthlyExpenses = expenses
     .filter((expense) => {
+      // Exclude Paycheck category
+      if (expense.category === "Paycheck") return false;
       const expenseDate = new Date(expense.date);
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
       return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
     })
     .reduce((sum, expense) => {
-      const isCredit = expense.credit === true || expense.credit === "true";
+      const isCredit = expense.credit === true;
       if (isCredit) {
         return sum - expense.amount; // Subtract credit expenses (income/revenue)
       }
@@ -410,12 +414,9 @@ return (
           </div>
           <div className="ml-4">
             <p className="text-sm text-gray-600 dark:text-gray-300">Net Expenses</p>
-            <p className={`text-2xl font-bold ${totalExpenses < 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
-              {totalExpenses < 0 ? '-' : ''}${Math.abs(totalExpenses).toFixed(2)}
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              ${totalExpenses.toFixed(2)}
             </p>
-            {totalExpenses < 0 && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1">Income exceeds expenses</p>
-            )}
           </div>
         </div>
       </div>
@@ -426,12 +427,9 @@ return (
           </div>
           <div className="ml-4">
             <p className="text-sm text-gray-600 dark:text-gray-300">This Month (Net)</p>
-            <p className={`text-2xl font-bold ${monthlyExpenses < 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
-              {monthlyExpenses < 0 ? '-' : ''}${Math.abs(monthlyExpenses).toFixed(2)}
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              ${monthlyExpenses.toFixed(2)}
             </p>
-            {monthlyExpenses < 0 && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1">Income exceeds expenses</p>
-            )}
           </div>
         </div>
       </div>
@@ -700,7 +698,7 @@ return (
         <div className="space-y-3">
           {expenses.map((expense) => {
             const category = categories.find((cat) => cat.id === expense.category);
-            const isCredit = expense.credit === true || expense.credit === "true";
+            const isCredit = expense.credit === true;
             return (
               <div
                 key={expense.id}
@@ -731,18 +729,22 @@ return (
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => handleEditClick(expense)}
-                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClick(expense.id)}
-                    className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                  >
-                    Delete
-                  </button>
+                  {expense.category !== "Settlement" && (
+                    <>
+                      <button
+                        onClick={() => handleEditClick(expense)}
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(expense.id)}
+                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
                   <p className={`font-bold ${expense.credit ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                     {expense.credit ? '+' : ''}${expense.amount.toFixed(2)}
                   </p>

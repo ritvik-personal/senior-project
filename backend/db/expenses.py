@@ -3,6 +3,7 @@ from datetime import date, timedelta
 import logging
 
 from app.database import get_supabase_client, get_authenticated_client
+from app.constants import ExpenseCategory
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def create_expense(
     # if metadata is not None:
     #     payload["metadata"] = metadata
 
-    logger.debug("Inserting expense payload=%s", payload)
+    logger.info(f"Inserting expense - Requested user_id: {user_id}, Payload: {payload}")
     
     # Use authenticated client if token is provided
     try:
@@ -84,7 +85,12 @@ def create_expense(
         
     if resp.data:
         expense_data = resp.data[0]
-        logger.debug("Database returned: %s", expense_data)
+        actual_user_id = expense_data.get("user_id")
+        logger.info(f"Expense created - Requested user_id: {user_id}, Actual user_id in DB: {actual_user_id}, Full response: {expense_data}")
+        
+        # Warn if the user_id doesn't match what we requested
+        if actual_user_id != user_id:
+            logger.warning(f"WARNING: Expense user_id mismatch! Requested: {user_id}, Got: {actual_user_id}. This may indicate an RLS policy issue.")
         
         # Extract expense_id from the created expense
         expense_id = expense_data.get("expense_id")
@@ -425,7 +431,7 @@ def sum_expenses(
     access_token: Optional[str] = None,
 ) -> int:
     table = _authenticated_table(access_token) if access_token else _table()
-    query = table.select("amount, credit", head=False).eq("user_id", user_id)
+    query = table.select("amount, credit, category", head=False).eq("user_id", user_id)
     if start_date:
         query = query.gte("created_at", start_date.isoformat())
     if end_date:
@@ -433,11 +439,17 @@ def sum_expenses(
         query = query.lt("created_at", inclusive_end.isoformat())
     if category:
         query = query.eq("category", category)
+    # Exclude "Paycheck" category from all expense calculations
+    query = query.neq("category", ExpenseCategory.PAYCHECK.value)
     resp = query.execute()
     rows = resp.data or []
     total = 0
     for row in rows:
         try:
+            # Skip if category is Paycheck (double check in case query filter didn't work)
+            row_category = row.get("category")
+            if row_category == ExpenseCategory.PAYCHECK.value:
+                continue
             # amount may be float/decimal
             amount = float(row.get("amount", 0))
             credit = row.get("credit", False)
@@ -447,6 +459,31 @@ def sum_expenses(
                 total -= amount
             else:
                 total += amount
+        except (TypeError, ValueError):
+            continue
+    return total
+
+def sum_paycheck_expenses(
+    user_id: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    access_token: Optional[str] = None,
+) -> float:
+    """Sum all paycheck expenses for a user within a date range"""
+    table = _authenticated_table(access_token) if access_token else _table()
+    query = table.select("amount", head=False).eq("user_id", user_id).eq("category", ExpenseCategory.PAYCHECK.value)
+    if start_date:
+        query = query.gte("created_at", start_date.isoformat())
+    if end_date:
+        inclusive_end = end_date + timedelta(days=1)
+        query = query.lt("created_at", inclusive_end.isoformat())
+    resp = query.execute()
+    rows = resp.data or []
+    total = 0.0
+    for row in rows:
+        try:
+            amount = float(row.get("amount", 0))
+            total += amount
         except (TypeError, ValueError):
             continue
     return total

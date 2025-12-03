@@ -119,6 +119,83 @@ async def create_budget_endpoint(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/savings-goal")
+async def get_savings_goal_endpoint(
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token)
+):
+    """Get the savings goal from the user's most recent budget"""
+    try:
+        # Get the most recent budget for the user
+        budgets = list_budgets(
+            user_id=current_user_id,
+            limit=1,
+            offset=0,
+            order_desc=True,
+            access_token=access_token
+        )
+        
+        if budgets and len(budgets) > 0:
+            savings_goal = budgets[0].get("savings_goal", 0.0)
+            return {"savings_goal": float(savings_goal)}
+        else:
+            # No budget found, return 0
+            return {"savings_goal": 0.0}
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching savings goal: {e}")
+        # Return 0 on error to avoid breaking the frontend
+        return {"savings_goal": 0.0}
+
+@router.get("/monthly-income")
+async def get_monthly_income_endpoint(
+    current_user_id: str = Depends(get_current_user_id),
+    access_token: str = Depends(get_access_token)
+):
+    """Get monthly income: first from budget, then from paycheck expenses, then 0"""
+    try:
+        # First, try to get monthly_income from the most recent budget
+        budgets = list_budgets(
+            user_id=current_user_id,
+            limit=1,
+            offset=0,
+            order_desc=True,
+            access_token=access_token
+        )
+        
+        if budgets and len(budgets) > 0:
+            monthly_income = budgets[0].get("monthly_income", 0.0)
+            if monthly_income and monthly_income > 0:
+                return {"monthly_income": float(monthly_income)}
+        
+        # If no budget or monthly_income is 0, try to get from paycheck expenses
+        from db.expenses import sum_paycheck_expenses
+        from datetime import date, datetime
+        
+        now = datetime.utcnow()
+        start_of_month = date(year=now.year, month=now.month, day=1)
+        end_date = now.date()
+        
+        paycheck_total = sum_paycheck_expenses(
+            user_id=current_user_id,
+            start_date=start_of_month,
+            end_date=end_date,
+            access_token=access_token
+        )
+        
+        if paycheck_total and paycheck_total > 0:
+            return {"monthly_income": float(paycheck_total)}
+        
+        # If neither exists, return 0
+        return {"monthly_income": 0.0}
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching monthly income: {e}")
+        # Return 0 on error to avoid breaking the frontend
+        return {"monthly_income": 0.0}
+
 @router.get("/{budget_id}", response_model=BudgetResponse)
 async def get_budget_endpoint(
     budget_id: str = Path(..., description="Budget ID"),

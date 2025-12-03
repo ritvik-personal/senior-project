@@ -116,7 +116,7 @@ def get_transactions_by_user_owed_and_user_owing(user_owed: str, user_owing: str
     resp = query.execute()
     return resp.data
 
-def get_grouped_transactions_for_user(user_id: str, group_ids: List[str]) -> Dict[str, Any]:
+def get_grouped_transactions_for_user(user_id: str, group_ids: List[str], access_token: Optional[str] = None) -> Dict[str, Any]:
     """
     Get grouped transactions for a user across their groups.
     Groups transactions by created_at (within 1 second) and user_owed.
@@ -130,7 +130,9 @@ def get_grouped_transactions_for_user(user_id: str, group_ids: List[str]) -> Dic
         }
     
     # Get all transactions for the user's groups
-    query = _table().select("*").in_("group_id", group_ids).order("created_at", desc=True)
+    # Use authenticated client if token is provided (needed for RLS)
+    table = _authenticated_table(access_token) if access_token else _table()
+    query = table.select("*").in_("group_id", group_ids).order("created_at", desc=True)
     resp = query.execute()
     all_transactions = resp.data or []
     

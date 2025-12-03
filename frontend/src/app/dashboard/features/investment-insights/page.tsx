@@ -76,6 +76,7 @@ export default function InvestmentInsightsPage() {
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const aiInsightsRef = useRef<HTMLDivElement>(null);
 
   // Sample AI insights (fallback if API fails)
   const sampleInsights: AIInsights = {
@@ -212,6 +213,16 @@ export default function InvestmentInsightsPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  // Scroll to AI insights when they are received
+  useEffect(() => {
+    if (aiInsights && aiInsightsRef.current) {
+      // Small delay to ensure the content is fully rendered
+      setTimeout(() => {
+        aiInsightsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [aiInsights]);
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -458,7 +469,7 @@ export default function InvestmentInsightsPage() {
 
           {/* AI Insights */}
           {aiInsights && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <div ref={aiInsightsRef} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
               <div className="flex items-center space-x-3 mb-4">
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">AI-Powered Analysis</h3>
                 <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-full text-xs font-medium">

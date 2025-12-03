@@ -38,6 +38,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<FeatureTab>('overview');
   const [monthlyExpensesTotal, setMonthlyExpensesTotal] = useState<number>(0);
   const [overallExpensesTotal, setOverallExpensesTotal] = useState<number>(0);
+  const [savingsGoal, setSavingsGoal] = useState<number>(0);
+  const [monthlyIncome, setMonthlyIncome] = useState<number>(0);
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -102,6 +104,42 @@ export default function Dashboard() {
     fetchOverallExpenses();
   }, []);
 
+  // Load savings goal from backend
+  useEffect(() => {
+    const fetchSavingsGoal = async () => {
+      try {
+        const token = api.getToken();
+        if (!token) return;
+        const response = await api.get(`budgets/savings-goal`);
+        const data = await response.json();
+        const goal = typeof data.savings_goal === 'number' ? data.savings_goal : 0;
+        setSavingsGoal(goal);
+      } catch (err) {
+        console.error('Failed to fetch savings goal:', err);
+      }
+    };
+
+    fetchSavingsGoal();
+  }, []);
+
+  // Load monthly income from backend (budget first, then paycheck expenses, then 0)
+  useEffect(() => {
+    const fetchMonthlyIncome = async () => {
+      try {
+        const token = api.getToken();
+        if (!token) return;
+        const response = await api.get(`budgets/monthly-income`);
+        const data = await response.json();
+        const income = typeof data.monthly_income === 'number' ? data.monthly_income : 0;
+        setMonthlyIncome(income);
+      } catch (err) {
+        console.error('Failed to fetch monthly income:', err);
+      }
+    };
+
+    fetchMonthlyIncome();
+  }, []);
+
 
   const handleLogout = async () => {
     try {
@@ -153,7 +191,7 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm text-gray-600 dark:text-gray-300">Monthly Income</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">$0.00</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">${monthlyIncome.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
@@ -177,7 +215,7 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm text-gray-600 dark:text-gray-300">Savings Goal</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">$0.00</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">${savingsGoal.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
