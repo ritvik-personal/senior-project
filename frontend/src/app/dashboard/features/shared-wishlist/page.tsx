@@ -62,7 +62,6 @@ export default function SharedWishlistPage() {
   const [selectedGroup, setSelectedGroup] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
   const [isParticipantDropdownOpen, setIsParticipantDropdownOpen] = useState(false);
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
   // Which items are being moved (set when opening move modal from a card)
   const [moveTargetIds, setMoveTargetIds] = useState<string[]>([]);
@@ -379,7 +378,6 @@ export default function SharedWishlistPage() {
     setCategory("");
     setDate(new Date().toISOString().split("T")[0]);
     setParticipants([]);
-    setReceiptFile(null);
     setIsParticipantDropdownOpen(false);
 
     setMoveTargetIds(ids); // store which items are being moved
@@ -390,11 +388,6 @@ export default function SharedWishlistPage() {
     setParticipants((prev) => (prev.includes(member) ? prev.filter((m) => m !== member) : [...prev, member]));
   };
 
-  const handleReceiptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setReceiptFile(e.target.files[0]);
-    }
-  };
 
   const confirmMoveToExpenses = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -438,7 +431,6 @@ export default function SharedWishlistPage() {
           type: expenseType,
           groupId: expenseType === "group" ? selectedGroup : undefined,
           participants: expenseType === "group" ? participants : [],
-          receiptUrl: receiptFile ? URL.createObjectURL(receiptFile) : undefined,
         };
       });
 
@@ -466,7 +458,6 @@ export default function SharedWishlistPage() {
       setExpenseType("personal");
       setSelectedGroup("");
       setParticipants([]);
-      setReceiptFile(null);
       setIsParticipantDropdownOpen(false);
       setShowMoveForm(false);
 
@@ -660,7 +651,6 @@ export default function SharedWishlistPage() {
                 setShowMoveForm(false);
                 setParticipants([]);
                 setIsParticipantDropdownOpen(false);
-                setReceiptFile(null);
                 setMoveTargetIds([]);
               }}
               className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
@@ -759,23 +749,10 @@ export default function SharedWishlistPage() {
                 </div>
               )}
 
-              {/* Upload Receipt */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload Receipt</label>
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
-                  <input type="file" accept="image/*" onChange={handleReceiptUpload} className="hidden" id="move-receipt-upload" />
-                  <label htmlFor="move-receipt-upload" className="cursor-pointer block">
-                    <span className="text-6xl mb-4 block">📷</span>
-                    <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">Click to upload receipt</p>
-                    <p className="text-gray-600 dark:text-gray-300">(Optional) OCR will be processed by backend later</p>
-                    {receiptFile && <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Selected: {receiptFile.name}</p>}
-                  </label>
-                </div>
-              </div>
 
               {/* Buttons */}
               <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={() => { setShowMoveForm(false); setParticipants([]); setIsParticipantDropdownOpen(false); setReceiptFile(null); setMoveTargetIds([]); }} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white">Cancel</button>
+                <button type="button" onClick={() => { setShowMoveForm(false); setParticipants([]); setIsParticipantDropdownOpen(false); setMoveTargetIds([]); }} className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white">Cancel</button>
                 <button type="submit" className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors">Confirm & Move</button>
               </div>
             </form>
