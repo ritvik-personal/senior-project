@@ -786,19 +786,18 @@ export default function CreditCardToolPage() {
               </div>
             </div>
 
-            <div className="flex justify-center space-x-6">
-              <button className="group bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <div className="flex justify-center">
+              <a
+                href={selectedCreditCard.application_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 inline-flex items-center justify-center"
+              >
                 <span className="flex items-center space-x-3">
                   <span className="text-xl">🚀</span>
                   <span>Apply Now</span>
                 </span>
-              </button>
-              <button className="group border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 hover:scale-105">
-                <span className="flex items-center space-x-3">
-                  <span className="text-xl">⚖️</span>
-                  <span>Compare Cards</span>
-                </span>
-              </button>
+              </a>
             </div>
           </div>
         </div>

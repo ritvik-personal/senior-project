@@ -310,8 +310,17 @@ Guidelines:
   * Key news impact
   * Valuation or financial health
   * Market sentiment or outlook
-- RECOMMENDATION: "buy", "hold", "sell", or "research" based on the analysis
-- RISK ASSESSMENT: "low", "medium", or "high" based on volatility and fundamentals
+- RECOMMENDATION: Choose based on actual analysis:
+  * "buy" = Strong positive signals: undervalued, good news, strong fundamentals, growth potential
+  * "hold" = Neutral/mixed signals: fair value, stable but no clear catalyst
+  * "sell" = Negative signals: overvalued, bad news, declining fundamentals, high risk
+  * "research" = Insufficient data or conflicting signals
+  DO NOT default to "hold" - make a real assessment based on the data and news.
+- RISK ASSESSMENT: Choose based on actual volatility and fundamentals:
+  * "low" = Stable company, low volatility, strong financials, established market position
+  * "medium" = Moderate volatility, average financials, some uncertainty
+  * "high" = High volatility, weak financials, uncertain outlook, speculative
+  DO NOT default to "medium" - assess the actual risk level based on P/E ratio, volatility, news sentiment, and financial health.
 
 Keep it simple and scannable. Use specific numbers from the data when relevant.
 
@@ -357,12 +366,17 @@ Recent News Articles (Last 7 Days):
             recommendation = insights_data.get("recommendation", "research").lower()
             risk_assessment = insights_data.get("riskAssessment", "medium").lower()
             
+            # Log what the AI returned for debugging
+            logger.info(f"AI returned recommendation: {recommendation}, riskAssessment: {risk_assessment}")
+            
             # Ensure recommendation is valid
             if recommendation not in ["buy", "hold", "sell", "research"]:
+                logger.warning(f"Invalid recommendation '{recommendation}', defaulting to 'research'")
                 recommendation = "research"
             
             # Ensure risk assessment is valid
             if risk_assessment not in ["low", "medium", "high"]:
+                logger.warning(f"Invalid riskAssessment '{risk_assessment}', defaulting to 'medium'")
                 risk_assessment = "medium"
             
             # Use highlights directly as keyPoints (backward compatible with schema)
