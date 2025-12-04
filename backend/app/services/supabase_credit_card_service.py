@@ -53,11 +53,7 @@ class SupabaseCreditCardService:
                 # Convert to schema format
                 card = SchemaCreditCard(**card_data)
                 
-                # Skip cards that don't meet basic criteria
-                if not self._meets_basic_criteria(card, answers):
-                    continue
-                
-                # Calculate content-based match score
+                # Calculate content-based match score (includes penalties for not meeting criteria)
                 match_score = self._calculate_content_score(card, answers)
                 
                 # Generate explanation
@@ -110,8 +106,28 @@ class SupabaseCreditCardService:
         return True
     
     def _calculate_content_score(self, card: SchemaCreditCard, answers: QuestionnaireAnswers) -> float:
-        """Calculate content-based matching score"""
+        """Calculate content-based matching score with penalties for not meeting criteria"""
         score = 0.0
+        
+        # Apply penalties for not meeting basic criteria (instead of filtering out)
+        # These penalties will significantly reduce the score but won't eliminate the card
+        
+        # Credit score check - penalty if outside range
+        if not (card.credit_score_min <= answers.credit_score <= card.credit_score_max):
+            score -= 5.0  # Large penalty for credit score mismatch
+        
+        # Student preference check - penalty if required but not available
+        if answers.preferences.get('student_friendly', False) and not card.student_friendly:
+            score -= 3.0  # Penalty for missing student-friendly feature
+        
+        # Annual fee preference check - penalty if doesn't match preference
+        annual_fee_pref = answers.preferences.get('annual_fee', 'none')
+        if annual_fee_pref == 'none' and card.annual_fee > 0:
+            score -= 2.0  # Penalty for having annual fee when user wants none
+        elif annual_fee_pref == 'low' and card.annual_fee > 50:
+            score -= 1.0  # Penalty for high annual fee when user wants low
+        
+        # Now calculate positive matching points
         
         # Rewards type match (3 points)
         if answers.preferences.get('rewards') == card.rewards_type:
@@ -132,8 +148,7 @@ class SupabaseCreditCardService:
             overlap = len(spending_categories.intersection(card_categories))
             score += overlap * 0.5
         
-        # Annual fee preference (1 point)
-        annual_fee_pref = answers.preferences.get('annual_fee', 'none')
+        # Annual fee preference (1 point) - bonus for matching
         if annual_fee_pref == 'none' and card.annual_fee == 0:
             score += 1.0
         elif annual_fee_pref == 'low' and 0 < card.annual_fee <= 50:
@@ -150,14 +165,16 @@ class SupabaseCreditCardService:
         # Rewards rate bonus (0.5 points per 1% rate)
         score += card.rewards_rate * 0.5
         
-        # Credit score compatibility bonus (0-2 points)
-        credit_score_range = card.credit_score_max - card.credit_score_min
-        credit_score_center = (card.credit_score_max + card.credit_score_min) / 2
-        credit_compatibility = 1.0 - abs(answers.credit_score - credit_score_center) / credit_score_range
-        credit_compatibility = max(0, credit_compatibility)
-        score += credit_compatibility * 2.0
+        # Credit score compatibility bonus (0-2 points) - only if within range
+        if card.credit_score_min <= answers.credit_score <= card.credit_score_max:
+            credit_score_range = card.credit_score_max - card.credit_score_min
+            credit_score_center = (card.credit_score_max + card.credit_score_min) / 2
+            credit_compatibility = 1.0 - abs(answers.credit_score - credit_score_center) / credit_score_range
+            credit_compatibility = max(0, credit_compatibility)
+            score += credit_compatibility * 2.0
         
-        return min(score, 10.0)  # Cap at 10
+        # Ensure score is at least 0 (no negative scores)
+        return max(0.0, min(score, 10.0))  # Cap at 10, floor at 0
     
     def _generate_explanation(self, card: SchemaCreditCard, answers: QuestionnaireAnswers) -> List[str]:
         """Generate explanation for why this card was recommended"""
